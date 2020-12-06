@@ -1,4 +1,4 @@
-# Returning the Gaze Exhibit
+# Can the subaltern speak? Exhibit
 
 ## First-time Setup
 
