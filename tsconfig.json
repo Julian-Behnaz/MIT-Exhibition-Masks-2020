@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "target": "es6",
+		"moduleResolution": "node",
+        "outDir": "./dist/",
+        "sourceMap": true,
+        "noImplicitAny": true,
+        "module": "commonjs",
+        "allowJs": true,
+        "checkJs": true,
+    },
+    "exclude": [
+        "node_modules",
+        "external",
+        "dist",
+        "deploy.js"
+    ]
+}

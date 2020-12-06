@@ -1,0 +1,122 @@
+@import "../node_modules/normalize.css/normalize.css";
+@import url("https://fonts.googleapis.com/css2?family=Lato&family=Open+Sans&family=Raleway&display=swap");
+
+.loading {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    color: white;
+    background-color: #333;
+    width: 100%;
+    z-index: 2;
+    text-align: center;
+    padding: 1rem;
+    /* Allow click to pass through */
+    pointer-events: none;
+}
+
+.loading-dots {
+    min-width: 1em;
+    display: inline-block;
+    text-align: left;
+}
+
+.interstitial, .landing {
+    width: 100%;
+    min-height: 100vh;
+    padding-bottom: 10rem;
+}
+
+.lauren-interstitial {
+    position: absolute;
+}
+
+/* Fonts */
+.intro p, .interstitial, .intro h2 {
+    font-family: 'Cinzel', serif;
+}
+
+.interstitial h2, .landing h2 {
+    font-size: 1.5rem;
+}
+
+.intro p {
+    font-size: 1.3rem;
+}
+
+.hall-list p {
+    font-size: 1rem;
+}
+
+.loading {
+    font-family: 'Lato', sans-serif;
+    font-size: 1.5rem;
+}
+
+.loading {
+    text-transform: uppercase;
+}
+
+.interstitial {
+    background-color: black;
+    color: white;
+}
+
+.landing {
+    background-color: white;
+    color: black;
+}
+
+h1, h2, .entering, .credits, .credits>.name {
+    text-align: center;
+}
+
+h1, h2 {
+    text-transform: uppercase;
+    margin: 0;
+}
+
+h3 {
+    margin: 0.5rem 0 0 0;
+    color: #777;
+}
+
+p {
+    text-align: justify;
+    text-justify: newspaper;
+}
+
+.landing ul {
+    list-style: none;
+    padding: 0 3rem;
+}
+
+.landing li {
+    display: flex;
+    align-items: center;
+}
+
+.landing li img {
+    height: 5rem;
+}
+
+.intro {
+    padding: 0 1rem;
+    padding-top: 5rem;
+    max-width: 40rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.credits, .entering {
+    text-transform: uppercase;
+}
+
+.name {
+    margin: 0;
+}
+
+.entering {
+    color: #777;
+    margin: 0.5rem;
+}

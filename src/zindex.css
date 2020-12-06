@@ -1,0 +1,23 @@
+@import "../node_modules/normalize.css/normalize.css";
+
+.main-view {
+    z-index: -1;
+}
+
+.iframe-hall {
+    z-index: -1;
+}
+
+.loading {
+    z-index: 20;
+}
+
+.interstitial, .landing {
+    z-index: 10;
+}
+
+.navigation {
+    z-index: 50;
+}
+
+
