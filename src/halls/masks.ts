@@ -1,5 +1,29 @@
-import { Vector3, Group, Scene, PerspectiveCamera, PlaneGeometry,AudioListener, MeshBasicMaterial, Mesh, WebGLRenderer, VideoTexture, FogExp2, LinearFilter, RGBFormat, AudioLoader } from "three";
-import { normalizeWheel,lerp, lerpTo } from "../utils"
+import { Vector3,
+     Group,
+     Scene,
+     PerspectiveCamera,
+     PlaneGeometry,
+     AudioListener,
+     MeshBasicMaterial,
+     Mesh,
+     WebGLRenderer,
+     VideoTexture,
+     FogExp2,
+     LinearFilter,
+     RGBFormat,
+     AudioLoader,
+     InstancedBufferGeometry,
+     InstancedBufferAttribute,
+     InstancedMesh,
+     BufferAttribute,
+     ShaderMaterial,
+     Matrix4,
+     DynamicDrawUsage,
+     Object3D,
+     TextureLoader,
+     Uniform
+     } from "three";
+import { normalizeWheel,lerp,lerpTo } from "../utils"
 import { Halls, Hall, HallState } from "../common"
 import { waypointMakeState, waypointReset, waypointMoveToMouse, waypointTryStartMove, waypointUpdate, WaypointState, WaypointMovingState } from "../waypoint"
 import { Loader, loader, load3dModel } from "../modelLoader"
@@ -11,6 +35,11 @@ import video4src from "../media/Mask05-2.webm";
 import video5src from "../media/Mask01.webm";
 import waypointSrc from "../models/waypointwhite.glb";
 import sound from "../media/MaskHallSound.webm";
+
+import fontTexture from '../media/font.png';
+import fontVertSrc from "../fontShaders/vert.vs";
+import fontFragSrc from "../fontShaders/frag.fs";
+import fontAtlasLayout from "../media/font";
 
 interface MasksHall extends Hall {
     state: {
@@ -104,21 +133,26 @@ const thisHall: MasksHall = {
                 
                 async function addPlanes() : Promise<void> {
                     return new Promise<void>((resolve, reject) => {
-                        Promise.all(state.videoSrcs.map(makeVideo)).then((videos) => {
-                            state.vids = videos;
+                        // Promise.all(state.videoSrcs.map(makeVideo)).then((videos) => {
+                        //     state.vids = videos;
                     
-                            let planes = state.vids.map(makePlane);
-                            for (let i = 0; i < planes.length; i++) {
-                                let pos = state.planeData[i].pos;
-                                let rot = state.planeData[i].rot;
-                                planes[i].position.set(pos[0],pos[1], pos[2]);
-                                planes[i].rotation.set(0,rot[1]*2*Math.PI/360,0);
-                                state.scene.add( planes[i] );
-                            }
-                            resolve();
-                        })
+                        //     let planes = state.vids.map(makePlane);
+                        //     for (let i = 0; i < planes.length; i++) {
+                        //         let pos = state.planeData[i].pos;
+                        //         let rot = state.planeData[i].rot;
+                        //         planes[i].position.set(pos[0],pos[1], pos[2]);
+                        //         planes[i].rotation.set(0,rot[1]*2*Math.PI/360,0);
+                        //         state.scene.add( planes[i] );
+                        //     }
+                        //     resolve();
+                        // })
+                        resolve();
                     });
                 }
+
+                const textChars = makeTextChars();
+                state.scene.add(textChars);
+
 
                 Promise.all([addWaypoint(loader, waypointSrc), addPlanes()]).then(() => {
                     // plane.rotation.set(Math.PI/3,Math.PI/3,Math.PI/3);
@@ -281,12 +315,79 @@ function makePlane(video: HTMLVideoElement) {
     return plane;
 }
 
+interface AtlasInfo {
+    [char: string]: {
+        left: number;
+        bottom: number;
+        right: number;
+        top: number;
+    }
+}
+
+function makeTextChars(): InstancedMesh {
+    const geometry = new InstancedBufferGeometry();
+    const vertices = new Float32Array( [
+        -1.0, -1.0,
+         1.0, -1.0,
+         1.0,  1.0,
+    
+         1.0,  1.0,
+        -1.0,  1.0,
+        -1.0, -1.0,
+    ] );
 
 
+    const glyphInfos = fontAtlasLayout.glyphs;
+    const charAtlasInfo: AtlasInfo = {};
+    for (let i = 0; i < glyphInfos.length; i++) {
+        if (glyphInfos[i].atlasBounds) {
+            charAtlasInfo[String.fromCharCode(glyphInfos[i].unicode)] = glyphInfos[i].atlasBounds;
+        } else {
+            charAtlasInfo[String.fromCharCode(glyphInfos[i].unicode)] = {
+                left: 255,
+                right: 255,
+                top: 0,
+                bottom: 0,
+            };
+        }
+    }
 
+    const maxCount = 500;
+    const atlasRegions = new Float32Array(maxCount*4);
 
+    const targetString = "Hello, Behnaz!";
 
+    for (let i = 0; i < targetString.length; i++) {
+        atlasRegions[i*4+0] = charAtlasInfo[targetString[i]].left;
+        atlasRegions[i*4+1] = charAtlasInfo[targetString[i]].bottom;
+        atlasRegions[i*4+2] = charAtlasInfo[targetString[i]].right;
+        atlasRegions[i*4+3] = charAtlasInfo[targetString[i]].top;
+    }
 
+    geometry.setAttribute( 'position', new BufferAttribute( vertices, 2/* components per vertex */ ) );
+    geometry.setAttribute( 'atlasRegion', new InstancedBufferAttribute(atlasRegions, 4) );
 
+    const texture = new TextureLoader().load( fontTexture );
 
+    const material = new ShaderMaterial( {
+        uniforms: {
+            fontTexture: new Uniform(texture),
+        },
+        vertexShader: fontVertSrc,
+        fragmentShader: fontFragSrc
+    } );
+    material.extensions.derivatives = true;
 
+    const mesh = new InstancedMesh(geometry,material,maxCount);
+    mesh.instanceMatrix.setUsage( DynamicDrawUsage );
+
+    const matrix = new Matrix4();
+    for (let i = 0; i < maxCount; i++) {
+        matrix.makeTranslation( (i- targetString.length/2)*2.1, 0.0, -10 );
+        mesh.setMatrixAt( i, matrix );
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+
+    mesh.count = targetString.length;
+    return mesh;
+}

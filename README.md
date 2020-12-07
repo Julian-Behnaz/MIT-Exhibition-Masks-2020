@@ -32,3 +32,5 @@ npm run build
 npm run deploy
 ```
 
+Multi-channel signed distance field generator. Inspired by:
+https://github.com/Chlumsky/msdfgen

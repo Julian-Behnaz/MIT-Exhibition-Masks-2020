@@ -55,6 +55,14 @@ module.exports = {
           'file-loader',
         ],
       },
+      {
+        test: /\.(vs|fs)$/i,
+        use: 'raw-loader',
+      },
+      { 
+        test: /\.json$/, 
+        loader: 'json-loader'
+      },
     ],
   },
   resolve: {

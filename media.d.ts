@@ -1,14 +1,14 @@
 declare module "*.webm" {
-    const content: string;
-    export default content;
+    const filename: string;
+    export default filename;
 }
 
 declare module "*.glb" {
-    const content: string;
-    export default content;
+    const filename: string;
+    export default filename;
 }
 
 declare module "*.png" {
-    const content: string;
-    export default content;
+    const filename: string;
+    export default filename;
 }
