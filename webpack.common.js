@@ -16,7 +16,7 @@ module.exports = {
     }),
     new CopyWebpackPlugin({
       patterns: [
-        { from: 'external/draco', to: 'draco' },
+        // { from: 'external/draco', to: 'draco' },
         { from: 'favicon', to: '.' },
       ],
     })
@@ -50,13 +50,13 @@ module.exports = {
         loader: 'html-loader',
       },
       {
-        test: /\.(png|svg|jpg|gif|webm|glb)$/,
+        test: /\.(png|svg|jpg|gif|webm|glb|woff|woff2)$/,
         use: [
           'file-loader',
         ],
       },
       {
-        test: /\.(vs|fs)$/i,
+        test: /\.(vs|fs|txt)$/i,
         use: 'raw-loader',
       },
       { 

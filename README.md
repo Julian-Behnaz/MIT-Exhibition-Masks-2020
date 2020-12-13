@@ -32,5 +32,10 @@ npm run build
 npm run deploy
 ```
 
-Multi-channel signed distance field generator. Inspired by:
-https://github.com/Chlumsky/msdfgen
+### Uses multi-channel signed distance field.
+Atlas generator from: https://github.com/Chlumsky/msdfgen
+
+Command:
+```
+    ./msdf-atlas-gen.exe -font Lora-Regular.ttf -type msdf -format png -dimensions 255 255 -imageout Lora_sdf.png -json Lora_layout.json -pxrange 2
+```

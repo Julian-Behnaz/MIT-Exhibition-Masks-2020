@@ -21,45 +21,64 @@ import { Vector3,
      DynamicDrawUsage,
      Object3D,
      TextureLoader,
-     Uniform
+     Uniform,
+     DoubleSide,
+     
+     NeverDepth,
+     AlwaysDepth,
+     LessDepth,
+     LessEqualDepth,
+     EqualDepth,
+     GreaterEqualDepth,
+     GreaterDepth,
+     NotEqualDepth,
+     AdditiveBlending
      } from "three";
 import { normalizeWheel,lerp,lerpTo } from "../utils"
 import { Halls, Hall, HallState } from "../common"
 import { waypointMakeState, waypointReset, waypointMoveToMouse, waypointTryStartMove, waypointUpdate, WaypointState, WaypointMovingState } from "../waypoint"
-import { Loader, loader, load3dModel } from "../modelLoader"
 
 import video1src from "../media/Mask03-3.webm";
 import video2src from "../media/Mask02.webm";
 import video3src from "../media/Mask04.webm";
 import video4src from "../media/Mask05-2.webm";
 import video5src from "../media/Mask01.webm";
-import waypointSrc from "../models/waypointwhite.glb";
 import sound from "../media/MaskHallSound.webm";
 
-import fontTexture from '../media/font.png';
+import fontTexture from '../media/Lora_sdf.png';
 import fontVertSrc from "../fontShaders/vert.vs";
 import fontFragSrc from "../fontShaders/frag.fs";
-import fontAtlasLayout from "../media/font";
+import fontAtlasLayout from "../media/Lora_layout";
+
+import markovSource from "../media/TEXT.txt";
+import waypointTexture from "../media/waypoint.png";
 
 interface MasksHall extends Hall {
     state: {
         videoSrcs: string[],
         planeData: { pos: [number, number, number], rot: [number, number, number] }[],
         vids: HTMLVideoElement[],
+        sound: HTMLVideoElement[]
         scene: Scene,
         camera: PerspectiveCamera,
         waypointState: WaypointState,
-        waypoint: Group | null,
+        waypoint: Mesh | Group | null,
         progressFrac: number,
         loadedOnce: boolean,
         mousePos: Vector3,
         cameraTargetRotY: number,
+        markovState: MarkovState[],
+        ngramAnalysis: MarkovAnalysis
     }
 }
 
 const moveSpeed = 0.05;
 const hallwayFloorY = -0.5;
-const hallwayLength = 7.5;
+const hallwayLength = 17.5;
+const textHallwayLength = 7.5;
+const hallwayWidth = 5;
+const hallwayHeight = 1.8;
+const hallTextOffset = -1.0;
 
 const thisHall: MasksHall = {
     name: "Hall of Eyes",
@@ -68,6 +87,7 @@ const thisHall: MasksHall = {
         videoSrcs: [],
         planeData: [],
         vids: [],
+        sound: [],
         scene: new Scene(),
         camera: new PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000),
         waypointState: waypointMakeState(hallwayFloorY),
@@ -76,6 +96,8 @@ const thisHall: MasksHall = {
         loadedOnce: false,
         mousePos: new Vector3(),
         cameraTargetRotY: 0,
+        markovState: [],
+        ngramAnalysis: ngramify(markovSource, 5)
     },
     setup: async function (): Promise<void> {
         function postLoad () {
@@ -87,39 +109,30 @@ const thisHall: MasksHall = {
         return new Promise<void>((resolve) => {
             if (!thisHall.state.loadedOnce) {
                 let state = thisHall.state;
-                // state.videoSrcs = [
-                //     video1src,
-                //     video2src,
-                //     video3src,
-                //     video4src,
-                //     video5src,
-                //     video6src,
-                // ];
                 state.videoSrcs = [
                     video1src,
                     video2src,
                     video3src,
                     video4src,
                     video5src,
-                    sound,
                 ];
                 state.planeData = [
-                    {pos: [-1,0,3-5-0.5], rot:  [0,45,0]},
-                    {pos: [1,0,4-5-0.5], rot:  [0,-30,0]},
-                    {pos: [-1,0,3-8], rot:  [0,35,0]},
-                    {pos: [1,0,5-8-1], rot:  [0,-15,0]},
-                    {pos: [0,0,3-10-1], rot: [0,0,0]},
-                    {pos: [15,0,3-10], rot: [0,0,0]},
+                    {pos: [-1,0,3-5-0.5-10], rot:  [0,45,0]},
+                    {pos: [1,0,4-5-0.5-10], rot:  [0,-30,0]},
+                    {pos: [-1,0,3-8-10], rot:  [0,35,0]},
+                    {pos: [1,0,5-8-1-10], rot:  [0,-15,0]},
+                    {pos: [0,0,3-10-1-10], rot: [0,0,0]},
                 ];
                 
-                async function addWaypoint(loader: Loader, waypointSrc: string): Promise<void> {
+                async function addWaypoint(waypointTex: string): Promise<void> {
                     return new Promise<void>((resolve, reject) => {
-                        // TODO: Get 3d model loading to work!!!
-                        // load3dModel(loader, waypointSrc).then((model) => {
-                        //     state.scene.add(model);
-                        //     state.waypoint = model;
-                        //     resolve();
-                        // });
+                        const texture = new TextureLoader().load( waypointTex );
+                        let geometry = new PlaneGeometry( 0.4, 0.4, 0.4 );
+                        geometry.rotateX(-Math.PI/2);
+                        const material = new MeshBasicMaterial({map: texture});
+                        let plane = new Mesh( geometry, material );
+                        state.scene.add(plane);
+                        state.waypoint = plane;
                         resolve(); 
                     });
                 }
@@ -127,35 +140,122 @@ const thisHall: MasksHall = {
 
                 var enableFog= true;
                 if(enableFog){
-                state. scene.fog= new FogExp2 (0x000000,0.1);
+                state. scene.fog= new FogExp2 (0x000000,0.2);
                 }
 
                 
-                async function addPlanes() : Promise<void> {
+                async function addBgAudio() : Promise<void> {
                     return new Promise<void>((resolve, reject) => {
-                        // Promise.all(state.videoSrcs.map(makeVideo)).then((videos) => {
-                        //     state.vids = videos;
-                    
-                        //     let planes = state.vids.map(makePlane);
-                        //     for (let i = 0; i < planes.length; i++) {
-                        //         let pos = state.planeData[i].pos;
-                        //         let rot = state.planeData[i].rot;
-                        //         planes[i].position.set(pos[0],pos[1], pos[2]);
-                        //         planes[i].rotation.set(0,rot[1]*2*Math.PI/360,0);
-                        //         state.scene.add( planes[i] );
-                        //     }
-                        //     resolve();
-                        // })
-                        resolve();
+                        makeSound(sound).then((sound) => {
+                            state.sound.push(sound);
+                            resolve();
+                        });
                     });
                 }
 
-                const textChars = makeTextChars();
-                state.scene.add(textChars);
+                async function addPlanes() : Promise<void> {
+                    return new Promise<void>((resolve, reject) => {
+                        Promise.all(state.videoSrcs.map(makeVideo)).then((videos) => {
+                            state.vids = videos;
+                    
+                            let planes = state.vids.map(makePlane);
+                            for (let i = 0; i < planes.length; i++) {
+                                let pos = state.planeData[i].pos;
+                                let rot = state.planeData[i].rot;
+                                planes[i].position.set(pos[0],pos[1], pos[2]);
+                                planes[i].rotation.set(0,rot[1]*2*Math.PI/360,0);
+                                state.scene.add( planes[i] );
+                            }
+                            resolve();
+                        });
+                    });
+                }
 
 
-                Promise.all([addWaypoint(loader, waypointSrc), addPlanes()]).then(() => {
-                    // plane.rotation.set(Math.PI/3,Math.PI/3,Math.PI/3);
+            
+
+            const txtMat = makeTextMaterial();
+            // for (let i = 0; i < 20; i++) {
+            //     const txt = generateMarkovText(thisHall.state.ngramAnalysis, 500);
+            //     const ms: MarkovState = {
+            //         nextUpdateTs: window.performance.now() + 1000,
+            //         targetText: txt,
+            //         currLen: 0,
+            //         text: makeTextChars(txtMat, 500)
+            //     };
+            //     updateText(ms.text, ms.targetText);
+            //     thisHall.state.markovState.push(ms);
+            //     state.scene.add(ms.text.mesh);
+            //     ms.text.mesh.position.y = hallwayFloorY + i*0.2;
+            //     ms.text.mesh.position.z = hallTextOffset;
+            //     ms.text.mesh.position.x = -hallwayWidth/2;
+            //     ms.text.mesh.scale.x = 0.2;
+            //     ms.text.mesh.scale.y = 0.2;
+            //     ms.text.mesh.scale.z = 0.2;
+            //     ms.text.mesh.rotateY(Math.PI*0.5);
+            // }
+            // for (let i = 0; i < 20; i++) {
+            //     const txt = generateMarkovText(thisHall.state.ngramAnalysis, 500);
+            //     const ms: MarkovState = {
+            //         nextUpdateTs: window.performance.now() + 1000,
+            //         targetText: txt,
+            //         currLen: 0,
+            //         text: makeTextChars(txtMat, 500)
+            //     };
+            //     updateText(ms.text, ms.targetText);
+            //     thisHall.state.markovState.push(ms);
+            //     state.scene.add(ms.text.mesh);
+            //     ms.text.mesh.position.y = hallwayFloorY + i*0.2;
+            //     ms.text.mesh.position.z = -textHallwayLength;
+            //     ms.text.mesh.position.x = hallwayWidth/2;
+            //     ms.text.mesh.scale.x = 0.2;
+            //     ms.text.mesh.scale.y = 0.2;
+            //     ms.text.mesh.scale.z = 0.2;
+            //     ms.text.mesh.rotateY(-Math.PI*0.5);
+            // }
+            const textsPerSide = 50;
+            for (let i = 0; i < textsPerSide; i++) {
+                const txt = generateMarkovText(thisHall.state.ngramAnalysis, 500);
+                const ms: MarkovState = {
+                    nextUpdateTs: window.performance.now() + 1000,
+                    targetText: txt,
+                    currLen: (txt.length * pickFloat01())|0,
+                    text: makeTextChars(txtMat, 500),
+                    textSide: -1
+                };
+                updateText(ms.text, ms.targetText);
+                thisHall.state.markovState.push(ms);
+                state.scene.add(ms.text.mesh);
+                ms.text.mesh.position.y = hallwayFloorY + (i/textsPerSide)*hallwayHeight;
+                ms.text.mesh.position.z = hallTextOffset;
+                ms.text.mesh.position.x = ms.textSide * hallwayWidth/2 * pickFloat01();
+                ms.text.mesh.scale.x = 0.2;
+                ms.text.mesh.scale.y = 0.2;
+                ms.text.mesh.scale.z = 0.2;
+                ms.text.mesh.rotateY(Math.PI*0.5);
+            }
+            for (let i = 0; i < textsPerSide; i++) {
+                const txt = generateMarkovText(thisHall.state.ngramAnalysis, 500);
+                const ms: MarkovState = {
+                    nextUpdateTs: window.performance.now() + 1000,
+                    targetText: txt,
+                    currLen: (txt.length * pickFloat01())|0,
+                    text: makeTextChars(txtMat, 500),
+                    textSide: 1
+                };
+                updateText(ms.text, ms.targetText);
+                thisHall.state.markovState.push(ms);
+                state.scene.add(ms.text.mesh);
+                ms.text.mesh.position.y = hallwayFloorY + (i/textsPerSide)*hallwayHeight;
+                ms.text.mesh.position.z = -textHallwayLength;
+                ms.text.mesh.position.x = ms.textSide * hallwayWidth/2 * pickFloat01();
+                ms.text.mesh.scale.x = 0.2;
+                ms.text.mesh.scale.y = 0.2;
+                ms.text.mesh.scale.z = 0.2;
+                ms.text.mesh.rotateY(-Math.PI*0.5);
+            }
+
+                Promise.all([addWaypoint(waypointTexture), addPlanes(), addBgAudio()]).then(() => {
                     thisHall.state.loadedOnce = true;
                     postLoad();
                     resolve();
@@ -173,18 +273,52 @@ const thisHall: MasksHall = {
             vid.muted = false;
             vid.play();
         });
+        thisHall.state.sound.forEach(sound => {
+            sound.muted = false;
+            sound.play()
+        });
         registerEventListeners();
     },
     onLeave: function () {
         thisHall.state.vids.forEach(vid => {
             vid.muted = true;
         });
+        thisHall.state.sound.forEach(sound => {
+            sound.muted = true;
+        });
         removeEventListeners();
     },
     render: function (renderer) {
         let state = thisHall.state;
 
+        const markovState = thisHall.state.markovState;
+        const currTs = window.performance.now();
+        for (let i = 0; i < markovState.length; i++) {
+            const ms = markovState[i];
 
+            if (currTs > ms.nextUpdateTs) {
+                ms.nextUpdateTs = currTs + 100;
+                ms.currLen++;
+                if (ms.currLen > ms.targetText.length) {
+                    ms.targetText = generateMarkovText(thisHall.state.ngramAnalysis, ms.text.maxCount);
+                    updateText(ms.text, ms.targetText);
+                    ms.currLen = 0;
+
+                    ms.text.mesh.position.y = hallwayFloorY + pickFloat01()*hallwayHeight;
+                    if (ms.textSide > 0) {
+                        ms.text.mesh.position.z = -textHallwayLength;
+                    } else {
+                        ms.text.mesh.position.z = hallTextOffset;
+                    }
+                    ms.text.mesh.position.x = ms.textSide * hallwayWidth/2 * pickFloat01();
+
+                }
+                ms.text.mesh.count = ms.currLen;
+            }
+        }
+
+        
+        // currLen
       
         // state.camera.position.set(0, 0, state.progressFrac * -hallwayLength);
 
@@ -233,7 +367,7 @@ const windowEventListeners: WindowListeners = {
         let evt = normalizeWheel(scrollEvt);
         let state = thisHall.state;
         if (thisHall.state.waypointState.state === WaypointMovingState.Idle) {
-            state.progressFrac -= evt.pixelY * 0.0001 * hallwayLength;
+            state.progressFrac -= evt.pixelY * 0.00001 * hallwayLength;
             state.progressFrac = Math.max(0, Math.min(1, state.progressFrac));
         }
     },
@@ -268,6 +402,33 @@ function removeEventListeners() {
     }
 }
 
+
+async function makeSound(webmSource: string): Promise<HTMLVideoElement> {
+    let video = document.createElement("video");
+    let isSupported = video.canPlayType("video/webm");
+
+    return new Promise<HTMLVideoElement>((resolve, reject) => {
+        if (isSupported) {
+            video.src = webmSource;
+            video.width = 640;
+            video.height = 480;
+            video.loop = true;
+        
+            video.preload = 'auto';
+            video.muted = true;
+    
+            function onCanPlay () {
+                console.log(webmSource);
+                resolve(video);
+                video.removeEventListener("canplay", onCanPlay);
+            }
+
+            video.addEventListener("canplay", onCanPlay);
+        } else {
+            reject("Your browser doesn't support webm videos.");
+        }
+    });
+}
 
 async function makeVideo(webmSource: string): Promise<HTMLVideoElement> {
     let video = document.createElement("video");
@@ -316,15 +477,68 @@ function makePlane(video: HTMLVideoElement) {
 }
 
 interface AtlasInfo {
-    [char: string]: {
-        left: number;
-        bottom: number;
-        right: number;
-        top: number;
+    advance: number
+    planeBounds: {
+        left: number
+        bottom: number
+        right: number
+        top: number
+    }
+    atlasBounds: {
+        left: number
+        bottom: number
+        right: number
+        top: number
     }
 }
 
-function makeTextChars(): InstancedMesh {
+interface AtlasInfos {
+    [char: string]: AtlasInfo
+}
+
+interface DynamicText {
+    _tempMatrix: Matrix4
+    maxCount: number
+    atlasRegions: Float32Array
+    atlasRegionsAttribute: InstancedBufferAttribute
+    mesh: InstancedMesh,
+    atlasInfos: AtlasInfos
+}
+
+function makeTextMaterial (): ShaderMaterial {
+    const texture = new TextureLoader().load( fontTexture );
+    // texture.generateMipmaps = false;
+    texture.premultiplyAlpha = true;
+
+    const material = new ShaderMaterial( {
+        transparent: true,
+        // depthTest: true,
+
+        // depthWrite: false,
+        // blending: AdditiveBlending,
+        
+        //  depthFunc: NeverDepth,
+        //  depthFunc: AlwaysDepth,
+        //  depthFunc: LessDepth,
+        //  depthFunc: LessEqualDepth,
+        //  depthFunc: EqualDepth,
+        //  depthFunc: GreaterEqualDepth,
+        //  depthFunc: GreaterDepth,
+        //  depthFunc: NotEqualDepth,
+        
+        // side: DoubleSide,
+        uniforms: {
+            fontTexture: new Uniform(texture),
+        },
+        vertexShader: fontVertSrc,
+        fragmentShader: fontFragSrc
+    } );
+    material.extensions.derivatives = true;
+
+    return material;
+}
+
+function makeTextChars(material: ShaderMaterial, maxCount: number): DynamicText {
     const geometry = new InstancedBufferGeometry();
     const vertices = new Float32Array( [
         -1.0, -1.0,
@@ -335,59 +549,181 @@ function makeTextChars(): InstancedMesh {
         -1.0,  1.0,
         -1.0, -1.0,
     ] );
-
+    geometry.setAttribute( 'position', new BufferAttribute( vertices, 2/* components per vertex */ ) );
 
     const glyphInfos = fontAtlasLayout.glyphs;
-    const charAtlasInfo: AtlasInfo = {};
+    const charAtlasInfo: AtlasInfos = {};
     for (let i = 0; i < glyphInfos.length; i++) {
+        let info: Partial<AtlasInfo> = {}; 
         if (glyphInfos[i].atlasBounds) {
-            charAtlasInfo[String.fromCharCode(glyphInfos[i].unicode)] = glyphInfos[i].atlasBounds;
+            info.atlasBounds = glyphInfos[i].atlasBounds;
         } else {
-            charAtlasInfo[String.fromCharCode(glyphInfos[i].unicode)] = {
-                left: 255,
-                right: 255,
+            info.atlasBounds = {
+                left: 0,
+                right: 0,
                 top: 0,
                 bottom: 0,
             };
         }
+        if (glyphInfos[i].planeBounds) {
+            info.planeBounds = glyphInfos[i].planeBounds;
+        } else {
+            info.planeBounds = {
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+            };
+        }
+        info.advance = glyphInfos[i].advance;
+        charAtlasInfo[String.fromCharCode(glyphInfos[i].unicode)] = <AtlasInfo>info;
     }
 
-    const maxCount = 500;
+
     const atlasRegions = new Float32Array(maxCount*4);
-
-    const targetString = "Hello, Behnaz!";
-
-    for (let i = 0; i < targetString.length; i++) {
-        atlasRegions[i*4+0] = charAtlasInfo[targetString[i]].left;
-        atlasRegions[i*4+1] = charAtlasInfo[targetString[i]].bottom;
-        atlasRegions[i*4+2] = charAtlasInfo[targetString[i]].right;
-        atlasRegions[i*4+3] = charAtlasInfo[targetString[i]].top;
-    }
-
-    geometry.setAttribute( 'position', new BufferAttribute( vertices, 2/* components per vertex */ ) );
-    geometry.setAttribute( 'atlasRegion', new InstancedBufferAttribute(atlasRegions, 4) );
-
-    const texture = new TextureLoader().load( fontTexture );
-
-    const material = new ShaderMaterial( {
-        uniforms: {
-            fontTexture: new Uniform(texture),
-        },
-        vertexShader: fontVertSrc,
-        fragmentShader: fontFragSrc
-    } );
-    material.extensions.derivatives = true;
 
     const mesh = new InstancedMesh(geometry,material,maxCount);
     mesh.instanceMatrix.setUsage( DynamicDrawUsage );
 
-    const matrix = new Matrix4();
-    for (let i = 0; i < maxCount; i++) {
-        matrix.makeTranslation( (i- targetString.length/2)*2.1, 0.0, -10 );
+
+    const res: DynamicText = {
+        _tempMatrix:  new Matrix4(),
+        atlasRegions: atlasRegions,
+        atlasRegionsAttribute: new InstancedBufferAttribute(atlasRegions, 4),
+        maxCount: maxCount,
+        mesh: mesh,
+        atlasInfos: charAtlasInfo
+    };
+
+    geometry.setAttribute( 'atlasRegion', res.atlasRegionsAttribute );
+    return res;
+}
+
+function updateText(text: DynamicText, targetString: string) {
+    const charAtlasInfo = text.atlasInfos;
+    const mesh = text.mesh;
+    const atlasRegions = text.atlasRegions;
+    let currX = 0;
+    const matrix = text._tempMatrix;
+    for (let i = 0; i < targetString.length; i++) {
+        const info = charAtlasInfo[targetString[i]];
+        const planeBounds = info.planeBounds;
+        const hDiv2 = (planeBounds.top - planeBounds.bottom)/2;
+        const wDiv2 = (planeBounds.right - planeBounds.left)/2;
+        const dX = planeBounds.left + wDiv2 + currX;
+        const dY = planeBounds.bottom + hDiv2;
+        const dZ = 0;
+        //This matrix is both a translation and scale matrix:
+        matrix.set( wDiv2, 0,     0, dX,
+                    0,     hDiv2, 0, dY,
+                    0,     0,     1, dZ,
+                    0,     0,     0, 1 );
+        currX += info.advance;
         mesh.setMatrixAt( i, matrix );
     }
     mesh.instanceMatrix.needsUpdate = true;
+    for (let i = 0; i < targetString.length; i++) {
+        const atlasBounds = charAtlasInfo[targetString[i]].atlasBounds;
+        atlasRegions[i*4+0] = atlasBounds.left;
+        atlasRegions[i*4+1] = atlasBounds.bottom;
+        atlasRegions[i*4+2] = atlasBounds.right;
+        atlasRegions[i*4+3] = atlasBounds.top;
+    }
+    text.atlasRegionsAttribute.needsUpdate = true;
+    // mesh.count = targetString.length;
+}
 
-    mesh.count = targetString.length;
-    return mesh;
+interface MarkovState {
+    nextUpdateTs: number
+    targetText: string
+    currLen: number
+    text: DynamicText
+    textSide: number
+}
+
+type MarkovAnalysis = {
+    freqs: Map<string, string[]>
+    beginnings: string[]
+    ngramLength: number
+}
+
+function ngramify(srcText: string, ngramLength: number): MarkovAnalysis {
+    const textLines = srcText.split('\n');
+    const res: MarkovAnalysis = {
+        freqs: new Map(),
+        beginnings: [],
+        ngramLength
+    };
+    const beginnings = res.beginnings;
+    const frequencies = res.freqs;
+
+    for (var j = 0; j < textLines.length; j++) {
+        var txt = textLines[j];
+        for (var i = 0; i <= txt.length - ngramLength; i++) {
+          var gram = txt.substring(i, i + ngramLength);
+    
+          if (i == 0) {
+            beginnings.push(gram);// string 
+          }
+    
+          let continuations = frequencies.get(gram);
+          if (!continuations) {
+            continuations = [];
+            frequencies.set(gram, continuations);
+          }
+          continuations.push(txt.charAt(i + ngramLength));
+        }
+    }
+    return res;
+}
+
+type PRNGState = Uint32Array
+
+const PRNG_STATE: PRNGState = Uint32Array.of(421563);
+
+// function xorshift64(state: PRNGState): number {
+// 	let x = state.a|0;
+// 	x ^= x << 13;
+// 	x ^= x >> 7;
+//     x ^= x << 17;
+//     state.a = x;
+// 	return state.a;
+// }
+
+function xorshift32(state: PRNGState): number {
+    let x = state[0];
+	x ^= (x << 13);
+	x ^= (x >>> 17);
+	x ^= (x << 5);
+	return state[0] = (x >>> 0);
+}
+
+/* in range 0 to 1, inclusive */
+function pickFloat01(): number {
+    const n = xorshift32(PRNG_STATE);
+    const res = n/(0xFFFFFFFF);
+    return res;
+}
+
+function pickFromArray(strings: string[]) {
+    const n = xorshift32(PRNG_STATE);// & (0x7FFFFFFF);
+    return strings[n % strings.length];
+}
+
+function generateMarkovText(analysis: MarkovAnalysis, maxLength: number): string {
+    let res = "";
+    let currentGram = pickFromArray(analysis.beginnings);
+    res = currentGram;
+
+    for (var i = 0; i < ((maxLength/analysis.ngramLength)|0); i++) {
+        const possibilities = analysis.freqs.get(currentGram);
+        if (!possibilities) {
+            break;
+        }
+        const nextGram = pickFromArray(possibilities);
+        res += nextGram;
+        currentGram = res.substring(res.length - analysis.ngramLength, res.length);
+    }
+
+    return res;
 }

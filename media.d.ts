@@ -12,3 +12,8 @@ declare module "*.png" {
     const filename: string;
     export default filename;
 }
+
+declare module "*.txt" {
+    const content: string;
+    export default content;
+}
