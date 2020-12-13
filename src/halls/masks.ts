@@ -3,7 +3,6 @@ import { Vector3,
      Scene,
      PerspectiveCamera,
      PlaneGeometry,
-     AudioListener,
      MeshBasicMaterial,
      Mesh,
      WebGLRenderer,
@@ -11,7 +10,7 @@ import { Vector3,
      FogExp2,
      LinearFilter,
      RGBFormat,
-     AudioLoader,
+     BufferGeometry,
      InstancedBufferGeometry,
      InstancedBufferAttribute,
      InstancedMesh,
@@ -19,20 +18,9 @@ import { Vector3,
      ShaderMaterial,
      Matrix4,
      DynamicDrawUsage,
-     Object3D,
      TextureLoader,
-     Uniform,
-     DoubleSide,
-     
-     NeverDepth,
-     AlwaysDepth,
-     LessDepth,
-     LessEqualDepth,
-     EqualDepth,
-     GreaterEqualDepth,
-     GreaterDepth,
-     NotEqualDepth,
-     AdditiveBlending
+     Uniform
+  
      } from "three";
 import { normalizeWheel,lerp,lerpTo } from "../utils"
 import { Halls, Hall, HallState } from "../common"
@@ -43,6 +31,7 @@ import video2src from "../media/Mask02.webm";
 import video3src from "../media/Mask04.webm";
 import video4src from "../media/Mask05-2.webm";
 import video5src from "../media/Mask01.webm";
+import largeVideoSrc from "../media/test2.webm";
 import sound from "../media/MaskHallSound.webm";
 
 import fontTexture from '../media/Lora_sdf.png';
@@ -53,12 +42,17 @@ import fontAtlasLayout from "../media/Lora_layout";
 import markovSource from "../media/TEXT.txt";
 import waypointTexture from "../media/waypoint.png";
 
+interface MarkovAnalyses {
+    [ngramLength: number]: MarkovAnalysis
+}
+
 interface MasksHall extends Hall {
     state: {
         videoSrcs: string[],
         planeData: { pos: [number, number, number], rot: [number, number, number] }[],
         vids: HTMLVideoElement[],
         sound: HTMLVideoElement[]
+        largeVideo: HTMLVideoElement[]
         scene: Scene,
         camera: PerspectiveCamera,
         waypointState: WaypointState,
@@ -68,17 +62,20 @@ interface MasksHall extends Hall {
         mousePos: Vector3,
         cameraTargetRotY: number,
         markovState: MarkovState[],
-        ngramAnalysis: MarkovAnalysis
+        ngramAnalyses: MarkovAnalyses
     }
 }
 
 const moveSpeed = 0.05;
 const hallwayFloorY = -0.5;
 const hallwayLength = 17.5;
-const textHallwayLength = 7.5;
+const textHallwayLength = 6.5;
 const hallwayWidth = 5;
 const hallwayHeight = 1.8;
 const hallTextOffset = -1.0;
+const initialNGramLen = 5;
+const maxCharsTowards = 360;
+const maxCharsAway = 105;
 
 const thisHall: MasksHall = {
     name: "Hall of Eyes",
@@ -87,9 +84,10 @@ const thisHall: MasksHall = {
         videoSrcs: [],
         planeData: [],
         vids: [],
+        largeVideo: [],
         sound: [],
         scene: new Scene(),
-        camera: new PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000),
+        camera: new PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000),
         waypointState: waypointMakeState(hallwayFloorY),
         waypoint: null,
         progressFrac: 0,
@@ -97,7 +95,7 @@ const thisHall: MasksHall = {
         mousePos: new Vector3(),
         cameraTargetRotY: 0,
         markovState: [],
-        ngramAnalysis: ngramify(markovSource, 5)
+        ngramAnalyses: ngramifyGroup(markovSource, initialNGramLen)
     },
     setup: async function (): Promise<void> {
         function postLoad () {
@@ -117,11 +115,11 @@ const thisHall: MasksHall = {
                     video5src,
                 ];
                 state.planeData = [
-                    {pos: [-1,0,3-5-0.5-10], rot:  [0,45,0]},
-                    {pos: [1,0,4-5-0.5-10], rot:  [0,-30,0]},
-                    {pos: [-1,0,3-8-10], rot:  [0,35,0]},
-                    {pos: [1,0,5-8-1-10], rot:  [0,-15,0]},
-                    {pos: [0,0,3-10-1-10], rot: [0,0,0]},
+                    {pos: [-1,0,-12.5], rot:  [0,45,0]},
+                    {pos: [1,0,-11.5], rot:  [0,-30,0]},
+                    {pos: [-1,0,-15], rot:  [0,35,0]},
+                    {pos: [1,0,-14], rot:  [0,-15,0]},
+                    {pos: [0,0,-18], rot: [0,0,0]},
                 ];
                 
                 async function addWaypoint(waypointTex: string): Promise<void> {
@@ -152,13 +150,27 @@ const thisHall: MasksHall = {
                         });
                     });
                 }
+                
+                async function addLargeVideo() : Promise<void> {
+                    return new Promise<void>((resolve, reject) => {
+                        makeVideoWithSize(largeVideoSrc, 4096, 512).then((video) => {
+                            const plane = makeCurvedScreen(video);
+                            // const plane = makeVideoPlane(video);
+                            // plane.position.set(0,hallwayFloorY, -12.5);
+                            plane.position.set(0,1, -12.5);
+                            state.scene.add(plane);
+                            thisHall.state.largeVideo.push(video);
+                            resolve();
+                        });
+                    });
+                }
 
                 async function addPlanes() : Promise<void> {
                     return new Promise<void>((resolve, reject) => {
                         Promise.all(state.videoSrcs.map(makeVideo)).then((videos) => {
                             state.vids = videos;
                     
-                            let planes = state.vids.map(makePlane);
+                            let planes = state.vids.map(makeVideoPlane);
                             for (let i = 0; i < planes.length; i++) {
                                 let pos = state.planeData[i].pos;
                                 let rot = state.planeData[i].rot;
@@ -213,15 +225,17 @@ const thisHall: MasksHall = {
             //     ms.text.mesh.scale.z = 0.2;
             //     ms.text.mesh.rotateY(-Math.PI*0.5);
             // }
+            
             const textsPerSide = 50;
             for (let i = 0; i < textsPerSide; i++) {
-                const txt = generateMarkovText(thisHall.state.ngramAnalysis, 500);
+                const txt = generateMarkovText(thisHall.state.ngramAnalyses[initialNGramLen], maxCharsAway);
                 const ms: MarkovState = {
-                    nextUpdateTs: window.performance.now() + 1000,
+                    nextUpdateTs: window.performance.now() + 1000,//pickFloat01()* 5000,
                     targetText: txt,
                     currLen: (txt.length * pickFloat01())|0,
-                    text: makeTextChars(txtMat, 500),
-                    textSide: -1
+                    text: makeTextChars(txtMat, maxCharsAway),
+                    textSide: -1,
+                    currNgramLength: initialNGramLen
                 };
                 updateText(ms.text, ms.targetText);
                 thisHall.state.markovState.push(ms);
@@ -235,13 +249,14 @@ const thisHall: MasksHall = {
                 ms.text.mesh.rotateY(Math.PI*0.5);
             }
             for (let i = 0; i < textsPerSide; i++) {
-                const txt = generateMarkovText(thisHall.state.ngramAnalysis, 500);
+                const txt = generateMarkovText(thisHall.state.ngramAnalyses[initialNGramLen], maxCharsTowards);
                 const ms: MarkovState = {
-                    nextUpdateTs: window.performance.now() + 1000,
+                    nextUpdateTs: window.performance.now() + 1000,//pickFloat01()* 5000,
                     targetText: txt,
                     currLen: (txt.length * pickFloat01())|0,
-                    text: makeTextChars(txtMat, 500),
-                    textSide: 1
+                    text: makeTextChars(txtMat, maxCharsTowards),
+                    textSide: 1,
+                    currNgramLength: initialNGramLen
                 };
                 updateText(ms.text, ms.targetText);
                 thisHall.state.markovState.push(ms);
@@ -255,7 +270,7 @@ const thisHall: MasksHall = {
                 ms.text.mesh.rotateY(-Math.PI*0.5);
             }
 
-                Promise.all([addWaypoint(waypointTexture), addPlanes(), addBgAudio()]).then(() => {
+                Promise.all([addWaypoint(waypointTexture), addPlanes(), addBgAudio(), addLargeVideo()]).then(() => {
                     thisHall.state.loadedOnce = true;
                     postLoad();
                     resolve();
@@ -277,6 +292,10 @@ const thisHall: MasksHall = {
             sound.muted = false;
             sound.play()
         });
+        thisHall.state.largeVideo.forEach(vid => {
+            vid.muted = false;
+            vid.play()
+        });
         registerEventListeners();
     },
     onLeave: function () {
@@ -285,6 +304,9 @@ const thisHall: MasksHall = {
         });
         thisHall.state.sound.forEach(sound => {
             sound.muted = true;
+        });
+        thisHall.state.largeVideo.forEach(vid => {
+            vid.muted = true;
         });
         removeEventListeners();
     },
@@ -300,7 +322,11 @@ const thisHall: MasksHall = {
                 ms.nextUpdateTs = currTs + 100;
                 ms.currLen++;
                 if (ms.currLen > ms.targetText.length) {
-                    ms.targetText = generateMarkovText(thisHall.state.ngramAnalysis, ms.text.maxCount);
+                    ms.currNgramLength--;
+                    if (ms.currNgramLength <= 1) {
+                        ms.currNgramLength = initialNGramLen;
+                    }
+                    ms.targetText = generateMarkovText(thisHall.state.ngramAnalyses[ms.currNgramLength], ms.text.maxCount);
                     updateText(ms.text, ms.targetText);
                     ms.currLen = 0;
 
@@ -374,7 +400,7 @@ const windowEventListeners: WindowListeners = {
     mousemove: (evt: MouseEvent) => {
         let frac = (evt.clientX - window.innerWidth / 2) / (window.innerWidth / 2); // [-1..1]
         let state = thisHall.state;
-        state.cameraTargetRotY= -frac * 0.6;
+        state.cameraTargetRotY= -frac * 0.9; //0.6;
         state.mousePos = new Vector3((evt.clientX / window.innerWidth) * 2 - 1, -(evt.clientY / window.innerHeight) * 2 + 1);
     },
     click: (evt: MouseEvent) => {
@@ -431,14 +457,18 @@ async function makeSound(webmSource: string): Promise<HTMLVideoElement> {
 }
 
 async function makeVideo(webmSource: string): Promise<HTMLVideoElement> {
+    return makeVideoWithSize(webmSource, 640, 480);
+}
+
+async function makeVideoWithSize(webmSource: string, width: number, height: number): Promise<HTMLVideoElement> {
     let video = document.createElement("video");
     let isSupported = video.canPlayType("video/webm");
 
     return new Promise<HTMLVideoElement>((resolve, reject) => {
         if (isSupported) {
             video.src = webmSource;
-            video.width = 640;
-            video.height = 480;
+            video.width = width;
+            video.height = height;
             video.loop = true;
         
             video.preload = 'auto';
@@ -465,15 +495,82 @@ function makeVideoTex(video: HTMLVideoElement) {
     return texture;
 }
 
-function makeMaterial(video: HTMLVideoElement) {
+function makeVideoMaterial(video: HTMLVideoElement) {
     return new MeshBasicMaterial( {map: makeVideoTex(video)} );
 }
 
-function makePlane(video: HTMLVideoElement) {
+function makeVideoPlane(video: HTMLVideoElement) {
     let geometry = new PlaneGeometry( 1.77777, 1, 1 );
-    let material = makeMaterial(video);
+    let material = makeVideoMaterial(video);
     let plane = new Mesh( geometry, material );
     return plane;
+}
+
+function makeCurvedScreen(video: HTMLVideoElement) {
+    let material = makeVideoMaterial(video);
+    const geometry = new BufferGeometry();
+
+    const cx = 0;
+    const cy = 0;
+    const r = 6;//2.75;
+    const numSegments = 20;
+    const numTris = (numSegments-1)*2;
+    const verts = new Float32Array(numSegments*2*3);
+    const uvs = new Float32Array(numSegments*2*2);
+    const indices = new Uint16Array(numTris*3);
+    const arcAngle = 3/2 * Math.PI;//  2 * 3.1415926;
+    const width = (r * arcAngle);
+    const height = 512/4096 * width;
+    { 
+        const theta = arcAngle / numSegments;
+        const c = Math.cos(theta);//precalculate the sine and cosine
+        const s = Math.sin(theta);
+        let t;
+    
+        // let x = 0;
+        // let y = r;
+
+        const correctiveAngle = (2 * Math.PI-arcAngle)/2;
+        let x = - r * Math.sin(correctiveAngle);
+        let y = r * Math.cos(correctiveAngle);
+        
+        for(let segIdx = 0; segIdx < numSegments; segIdx++) {
+            verts[(segIdx*2+0)*3+0] = x + cx;
+            verts[(segIdx*2+0)*3+1] = 0;
+            verts[(segIdx*2+0)*3+2] = y + cy;
+
+            verts[(segIdx*2+1)*3+0] = x + cx;
+            verts[(segIdx*2+1)*3+1] = height;
+            verts[(segIdx*2+1)*3+2] = y + cy;
+
+            uvs[(segIdx*2)*2 + 0] = segIdx/(numSegments-1);
+            uvs[(segIdx*2)*2 + 1] = 0;
+
+            uvs[(segIdx*2+1)*2 + 0] = segIdx/(numSegments-1);
+            uvs[(segIdx*2+1)*2 + 1] = 1;
+
+            //apply the rotation matrix
+            t = x;
+            x = c * x - s * y;
+            y = s * t + c * y;
+        }
+
+        for(let segIdx = 0; segIdx < numSegments-1; segIdx++) {
+            indices[segIdx*6+0] = 0 + 2 * segIdx;
+            indices[segIdx*6+1] = 3 + 2 * segIdx;
+            indices[segIdx*6+2] = 1 + 2 * segIdx;
+
+            indices[segIdx*6+3] = 0 + 2 * segIdx;
+            indices[segIdx*6+4] = 2 + 2 * segIdx;
+            indices[segIdx*6+5] = 3 + 2 * segIdx;
+        }
+    }
+    
+    geometry.setAttribute( 'position', new BufferAttribute( verts, 3 ) );
+    geometry.setAttribute( 'uv', new BufferAttribute( uvs, 2 ) );
+    geometry.setIndex(new BufferAttribute(indices, 1));
+    const mesh = new Mesh( geometry, material );
+    return mesh;
 }
 
 interface AtlasInfo {
@@ -639,12 +736,21 @@ interface MarkovState {
     currLen: number
     text: DynamicText
     textSide: number
+    currNgramLength: number
 }
 
 type MarkovAnalysis = {
     freqs: Map<string, string[]>
     beginnings: string[]
     ngramLength: number
+}
+
+function ngramifyGroup(srcText: string, maxNgramLength: number): MarkovAnalyses {
+    const res: MarkovAnalyses = {};
+    for (let i = 1; i <= maxNgramLength; i++) {
+        res[i] = ngramify(srcText, i);
+    }
+    return res;
 }
 
 function ngramify(srcText: string, ngramLength: number): MarkovAnalysis {

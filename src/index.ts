@@ -266,11 +266,7 @@ function handleHalls() {
                 halls.allHalls[halls.currHallIdx].render(halls.renderer);
                 let progress = halls.allHalls[halls.currHallIdx].getProgressFrac();
                 if (progress >= 0.99) {
-                    if (halls.currHallIdx === halls.allHalls.length-1) {
-                        halls.currHallIdx = 0;
-                    } else {
-                        halls.state = HallState.StartedLeavingHall;
-                    }
+                    halls.state = HallState.StartedLeavingHall;
                 }
             } break;
         case HallState.StartedLeavingHall:
