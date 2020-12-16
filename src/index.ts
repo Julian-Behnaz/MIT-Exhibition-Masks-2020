@@ -1,7 +1,7 @@
 import './main.css';
 import { Scene, PerspectiveCamera, PlaneGeometry, MeshBasicMaterial, Mesh, WebGLRenderer, VideoTexture, LinearFilter, RGBFormat } from "three";
 
-import { Halls, Hall, HallState } from "./common"
+import { Halls, Hall, HallState, RenderModeKind, RenderMode } from "./common"
 import { getTimestamp } from "./utils"
 import * as masksHall from "./halls/masks"
 
@@ -25,6 +25,9 @@ const halls: Halls = {
     nextState: HallState.Init,
     nextHallIdx: 0,
     allHalls: [masksHall],
+    renderMode: {
+        type: RenderModeKind.Interactive
+    }
 }
 
 const loadingIndicator = document.getElementsByClassName("js-loading")[0];
@@ -45,41 +48,6 @@ function canNavigate(state: HallState): boolean {
         state === HallState.WaitingToEnterHall
         /* || state === HallState.Landing || */);
 }
-
-
-function createNavLi(text: string) {
-    let li = document.createElement("li");
-    let txt = document.createElement("p");
-    txt.textContent = text;
-    li.appendChild(txt);
-    return li;
-}
-const hallLinks = halls.allHalls.map((hall, idx) => {
-    let li = createNavLi(hall.name);
-    function makeJumpToIdxOnClick(idx: number) {
-        return (evt: MouseEvent) => {
-            if ((halls.currHallIdx !== idx) &&
-                (canNavigate(halls.state))) {
-                halls.state = HallState.LeavingHall;
-                halls.allHalls[halls.currHallIdx].teardown().then(() => {
-                    halls.currHallIdx = idx;
-                    console.log(`Now entering hall: ${halls.currHallIdx}`);
-                    halls.state = HallState.StartedLoadingHall;
-                });
-                evt.preventDefault();
-                evt.stopPropagation();
-            }
-        }
-    }
-    li.addEventListener("click", makeJumpToIdxOnClick(idx));
-    return { li, decidingState: null, hallIdx: idx };
-});
-let ul = document.createElement("ul");
-
-for (let i = 0; i < hallLinks.length; i++) {
-    ul.appendChild(hallLinks[i].li);
-}
-
 
 const interstitials = {
     hallIntros: (() => {
@@ -173,22 +141,6 @@ function handleStateChange(lastState: HallState, lastIdx: number,
         case HallState.StartedLeavingHall: console.log("StartedLeavingHall"); break;
         case HallState.LeavingHall: console.log("LeavingHall"); break;
     }
-
-    let inAHall =
-        (state === HallState.StartedLoadingHall) ||
-        (state === HallState.LoadingHall) ||
-        (state === HallState.WaitingToEnterHall) ||
-        (state === HallState.InHall) ||
-        (state === HallState.StartedLeavingHall) ||
-        (state === HallState.LeavingHall);
-    for (let i = 0; i < hallLinks.length; i++) {
-        if ((inAHall && !hallLinks[i].decidingState && hallLinks[i].hallIdx == idx) ||
-            hallLinks[i].decidingState === state) {
-            hallLinks[i].li.classList.add("active");
-        } else {
-            hallLinks[i].li.classList.remove("active");
-        }
-    }
 }
 
 function updateLoadingDisplay(isLoading: boolean) {
@@ -210,6 +162,8 @@ function updateLoadingDisplay(isLoading: boolean) {
         document.body.style.cursor = "pointer";
     }
 }
+
+
 
 function handleHalls() {
     switch (halls.state) {
@@ -242,7 +196,7 @@ function handleHalls() {
 
                 halls.state = HallState.LoadingHall;
                 console.log("SETUP");
-                halls.allHalls[halls.currHallIdx].setup().then(() => {
+                halls.allHalls[halls.currHallIdx].setup(halls.renderMode).then(() => {
                     if (hasIntro) {
                         updateLoadingDisplay(false);
                         halls.state = HallState.WaitingToEnterHall;
@@ -262,11 +216,16 @@ function handleHalls() {
             } break;
         case HallState.InHall:
             {
-                halls.allHalls[halls.currHallIdx].resize();
-                halls.allHalls[halls.currHallIdx].render(halls.renderer);
-                let progress = halls.allHalls[halls.currHallIdx].getProgressFrac();
-                if (progress >= 0.99) {
-                    halls.state = HallState.StartedLeavingHall;
+                if (halls.renderMode.type === RenderModeKind.Interactive) {
+                    halls.allHalls[halls.currHallIdx].resize();
+                    halls.allHalls[halls.currHallIdx].render(halls.renderer);
+                    let progress = halls.allHalls[halls.currHallIdx].getProgressFrac();
+                    if (progress >= 0.99) {
+                        halls.state = HallState.StartedLeavingHall;
+                    }
+                } else if (halls.renderMode.type === RenderModeKind.SavePNG) {
+                    halls.allHalls[halls.currHallIdx].renderPNG(halls.renderer);
+                    halls.renderMode = { type: RenderModeKind.None };
                 }
             } break;
         case HallState.StartedLeavingHall:
@@ -293,8 +252,32 @@ function handleHalls() {
     halls.lastHallIdx = halls.currHallIdx;
 }
 
+const queryParams = new URLSearchParams(document.location.search);
+if (queryParams.has('seed') && queryParams.get('seed').indexOf(',page=') !== -1) {
+    // Fake query param format.
+    // Parse manually :(
+    const paramStr = queryParams.get('seed');
+    const seedStr = paramStr.substring(0,paramStr.indexOf(','));
+    const pageStr = paramStr.substring(paramStr.indexOf(',page=')+',page='.length);
+
+    halls.renderMode = {
+        type: RenderModeKind.SavePNG,
+        seed: parseInt(seedStr)|0,
+        page: parseInt(pageStr)|0
+    }
+} else if (queryParams.has('page') && queryParams.has('seed')) {
+    halls.renderMode = {
+        type: RenderModeKind.SavePNG,
+        seed: parseInt(queryParams.get('seed'))|0,
+        page: parseInt(queryParams.get('page'))|0
+    }
+}
+
 function renderLoop() {
     stats.begin();
+    if (halls.renderMode.type === RenderModeKind.SavePNG && halls.state === HallState.WaitingToEnterHall) {
+        halls.state = HallState.InHall;
+    }
     handleHalls();
     stats.end();
     requestAnimationFrame(renderLoop);

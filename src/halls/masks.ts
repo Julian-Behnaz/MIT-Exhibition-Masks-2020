@@ -23,14 +23,17 @@ import { Vector3,
   
      } from "three";
 import { normalizeWheel,lerp,lerpTo } from "../utils"
-import { Halls, Hall, HallState } from "../common"
+import { Halls, Hall, HallState, RenderModeKind, RenderMode } from "../common"
 import { waypointMakeState, waypointReset, waypointMoveToMouse, waypointTryStartMove, waypointUpdate, WaypointState, WaypointMovingState } from "../waypoint"
 
 import video1src from "../media/Mask03-3.webm";
-import video2src from "../media/Mask02.webm";
+import video2src from "../media/MaskF2.webm";
 import video3src from "../media/Mask04.webm";
 import video4src from "../media/Mask05-2.webm";
 import video5src from "../media/Mask01.webm";
+import video6src from "../media/MaskF1.webm";
+import video7src from "../media/C0106_1.webm";
+
 import largeVideoSrc from "../media/test2.webm";
 import sound from "../media/MaskHallSound.webm";
 
@@ -62,10 +65,12 @@ interface MasksHall extends Hall {
         mousePos: Vector3,
         cameraTargetRotY: number,
         markovState: MarkovState[],
-        ngramAnalyses: MarkovAnalyses
+        ngramAnalyses: MarkovAnalyses,
+        renderMode: RenderMode
     }
 }
 
+const PRNG_STATE: PRNGState = Uint32Array.of(421563);
 const moveSpeed = 0.05;
 const hallwayFloorY = -0.5;
 const hallwayLength = 17.5;
@@ -75,10 +80,10 @@ const hallwayHeight = 1.8;
 const hallTextOffset = -1.0;
 const initialNGramLen = 5;
 const maxCharsTowards = 360;
-const maxCharsAway = 105;
+const maxCharsAway = 200;
 
 const thisHall: MasksHall = {
-    name: "Hall of Eyes",
+    name: "Can the Subaltern Speak?",
     introId: "js-eyes-hall",
     state: {
         videoSrcs: [],
@@ -95,9 +100,17 @@ const thisHall: MasksHall = {
         mousePos: new Vector3(),
         cameraTargetRotY: 0,
         markovState: [],
-        ngramAnalyses: ngramifyGroup(markovSource, initialNGramLen)
+        ngramAnalyses: ngramifyGroup(markovSource, initialNGramLen),
+        renderMode: null
     },
-    setup: async function (): Promise<void> {
+    setup: async function (renderMode: RenderMode): Promise<void> {
+        thisHall.state.renderMode = renderMode;
+        if (renderMode.type === RenderModeKind.SavePNG) {
+            PRNG_STATE[0] = renderMode.seed;
+        } else {
+            PRNG_STATE[0] = ((window.performance.now() * 1000)|0)>>>0;
+        }
+
         function postLoad () {
             console.log("Postload - masks");
             thisHall.state.progressFrac= 0;
@@ -113,13 +126,17 @@ const thisHall: MasksHall = {
                     video3src,
                     video4src,
                     video5src,
+                    video6src,
+                    // video7src,
                 ];
                 state.planeData = [
                     {pos: [-1,0,-12.5], rot:  [0,45,0]},
-                    {pos: [1,0,-11.5], rot:  [0,-30,0]},
+                    {pos: [1,0,-11.0], rot:  [0,-30,0]},
                     {pos: [-1,0,-15], rot:  [0,35,0]},
                     {pos: [1,0,-14], rot:  [0,-15,0]},
                     {pos: [0,0,-18], rot: [0,0,0]},
+                    {pos: [-0.9,0,-9.5], rot: [0,30,0]},
+                    // {pos: [-2,0,-8.5], rot: [0,90,0]},
                 ];
                 
                 async function addWaypoint(waypointTex: string): Promise<void> {
@@ -154,12 +171,12 @@ const thisHall: MasksHall = {
                 async function addLargeVideo() : Promise<void> {
                     return new Promise<void>((resolve, reject) => {
                         makeVideoWithSize(largeVideoSrc, 4096, 512).then((video) => {
-                            const plane = makeCurvedScreen(video);
+                            // const plane = makeCurvedScreen(video);
                             // const plane = makeVideoPlane(video);
                             // plane.position.set(0,hallwayFloorY, -12.5);
-                            plane.position.set(0,1, -12.5);
-                            state.scene.add(plane);
-                            thisHall.state.largeVideo.push(video);
+                            // plane.position.set(0,1, -12.5);
+                            // state.scene.add(plane);
+                            // thisHall.state.largeVideo.push(video);
                             resolve();
                         });
                     });
@@ -296,7 +313,9 @@ const thisHall: MasksHall = {
             vid.muted = false;
             vid.play()
         });
-        registerEventListeners();
+        if (thisHall.state.renderMode.type === RenderModeKind.Interactive) {
+            registerEventListeners();
+        }
     },
     onLeave: function () {
         thisHall.state.vids.forEach(vid => {
@@ -308,38 +327,83 @@ const thisHall: MasksHall = {
         thisHall.state.largeVideo.forEach(vid => {
             vid.muted = true;
         });
-        removeEventListeners();
+        if (thisHall.state.renderMode.type === RenderModeKind.Interactive) {
+            removeEventListeners();
+        }
+    },
+    renderPNG: function (renderer) {
+        const state = thisHall.state;
+        const renderMode = state.renderMode;
+        if (renderMode.type === RenderModeKind.SavePNG) {
+            const imageWidth = 2412;
+            const imageHeight = 3074;
+
+            thisHall.state.camera.aspect = imageWidth / imageHeight;
+            thisHall.state.camera.updateProjectionMatrix();
+            renderer.domElement.width = imageWidth;
+            renderer.domElement.height = imageHeight;
+            renderer.setSize(imageWidth, imageHeight);
+
+            
+            const page2Angle = pickFloatBetween(0,0.6);
+
+            const camInfos = [
+                { posZ: 0, rotY: 0 }, // Page 1
+                { posZ: 1, rotY: page2Angle }, // Page 2
+                { posZ: 2, rotY: -page2Angle }, // Page 3
+                { posZ: 3, rotY: 0 }, // Page 4
+                { posZ: 4, rotY: 0 }, // Page 5
+            ];
+            const idx = renderMode.page >= 1 && renderMode.page <= 5? renderMode.page-1 : 0;
+            const camInfo = camInfos[idx];
+
+            state.camera.position.set(0, 0, camInfo.posZ);
+            state.camera.rotation.set(0, camInfo.rotY, 0);
+            
+            this.render(renderer);
+            renderer.domElement.toBlob((blob) => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${renderMode.seed}_${renderMode.page}.png`;
+                a.click();
+            });
+        }
     },
     render: function (renderer) {
         let state = thisHall.state;
 
-        const markovState = thisHall.state.markovState;
-        const currTs = window.performance.now();
-        for (let i = 0; i < markovState.length; i++) {
-            const ms = markovState[i];
+        const isInteractive = thisHall.state.renderMode.type === RenderModeKind.Interactive;
 
-            if (currTs > ms.nextUpdateTs) {
-                ms.nextUpdateTs = currTs + 100;
-                ms.currLen++;
-                if (ms.currLen > ms.targetText.length) {
-                    ms.currNgramLength--;
-                    if (ms.currNgramLength <= 1) {
-                        ms.currNgramLength = initialNGramLen;
+        if (isInteractive) {
+            const markovState = thisHall.state.markovState;
+            const currTs = window.performance.now();
+            for (let i = 0; i < markovState.length; i++) {
+                const ms = markovState[i];
+
+                if (currTs > ms.nextUpdateTs) {
+                    ms.nextUpdateTs = currTs + 100;
+                    ms.currLen++;
+                    if (ms.currLen > ms.targetText.length) {
+                        ms.currNgramLength--;
+                        if (ms.currNgramLength <= 2) {
+                            ms.currNgramLength = initialNGramLen;
+                        }
+                        ms.targetText = generateMarkovText(thisHall.state.ngramAnalyses[ms.currNgramLength], ms.text.maxCount);
+                        updateText(ms.text, ms.targetText);
+                        ms.currLen = 0;
+
+                        ms.text.mesh.position.y = hallwayFloorY + pickFloat01()*hallwayHeight;
+                        if (ms.textSide > 0) {
+                            ms.text.mesh.position.z = -textHallwayLength;
+                        } else {
+                            ms.text.mesh.position.z = hallTextOffset;
+                        }
+                        ms.text.mesh.position.x = ms.textSide * hallwayWidth/2 * pickFloat01();
+
                     }
-                    ms.targetText = generateMarkovText(thisHall.state.ngramAnalyses[ms.currNgramLength], ms.text.maxCount);
-                    updateText(ms.text, ms.targetText);
-                    ms.currLen = 0;
-
-                    ms.text.mesh.position.y = hallwayFloorY + pickFloat01()*hallwayHeight;
-                    if (ms.textSide > 0) {
-                        ms.text.mesh.position.z = -textHallwayLength;
-                    } else {
-                        ms.text.mesh.position.z = hallTextOffset;
-                    }
-                    ms.text.mesh.position.x = ms.textSide * hallwayWidth/2 * pickFloat01();
-
+                    ms.text.mesh.count = ms.currLen;
                 }
-                ms.text.mesh.count = ms.currLen;
             }
         }
 
@@ -349,9 +413,11 @@ const thisHall: MasksHall = {
         // state.camera.position.set(0, 0, state.progressFrac * -hallwayLength);
 
 
-        let targetCamZ = state.progressFrac * -hallwayLength;
-        state.camera.position.set(0, 0, lerp(moveSpeed, state.camera.position.z, targetCamZ));
-        state.camera.rotation.set(0, lerpTo(state.camera.rotation.y, state.cameraTargetRotY, moveSpeed, 0.001), 0);
+        if (isInteractive) {
+            let targetCamZ = state.progressFrac * -hallwayLength;
+            state.camera.position.set(0, 0, lerp(moveSpeed, state.camera.position.z, targetCamZ));
+            state.camera.rotation.set(0, lerpTo(state.camera.rotation.y, state.cameraTargetRotY, moveSpeed, 0.001), 0);
+        }
         
 
 
@@ -785,8 +851,6 @@ function ngramify(srcText: string, ngramLength: number): MarkovAnalysis {
 
 type PRNGState = Uint32Array
 
-const PRNG_STATE: PRNGState = Uint32Array.of(421563);
-
 // function xorshift64(state: PRNGState): number {
 // 	let x = state.a|0;
 // 	x ^= x << 13;
@@ -808,6 +872,12 @@ function xorshift32(state: PRNGState): number {
 function pickFloat01(): number {
     const n = xorshift32(PRNG_STATE);
     const res = n/(0xFFFFFFFF);
+    return res;
+}
+
+
+function pickFloatBetween(lo: number,hi: number,): number {
+    const res = (pickFloat01()*(hi-lo))+lo;
     return res;
 }
 
