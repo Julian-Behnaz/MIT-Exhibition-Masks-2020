@@ -27,11 +27,11 @@ import { Halls, Hall, HallState, RenderModeKind, RenderMode } from "../common"
 import { waypointMakeState, waypointReset, waypointMoveToMouse, waypointTryStartMove, waypointUpdate, WaypointState, WaypointMovingState } from "../waypoint"
 
 import video1src from "../media/Mask03-3.webm";
-import video2src from "../media/MaskF2.webm";
+import video6src from "../media/MaskF2.webm";
 import video3src from "../media/Mask04.webm";
 import video4src from "../media/Mask05-2.webm";
 import video5src from "../media/Mask01.webm";
-import video6src from "../media/MaskF1.webm";
+import video2src from "../media/MaskF1-1.webm";
 import video7src from "../media/C0106_1.webm";
 
 import largeVideoSrc from "../media/test2.webm";
@@ -348,7 +348,7 @@ const thisHall: MasksHall = {
             const page2Angle = pickFloatBetween(0,0.6);
 
             const camInfos = [
-                { posZ: 0, rotY: 0 }, // Page 1
+                { posZ: -12.3, rotY: 1 }, // Page 1
                 { posZ: 1, rotY: page2Angle }, // Page 2
                 { posZ: 2, rotY: -page2Angle }, // Page 3
                 { posZ: 3, rotY: 0 }, // Page 4
