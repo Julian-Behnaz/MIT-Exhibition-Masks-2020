@@ -32,9 +32,7 @@ import video3src from "../media/Mask04.webm";
 import video4src from "../media/Mask05-2.webm";
 import video5src from "../media/Mask01.webm";
 import video2src from "../media/MaskF1-1.webm";
-import video7src from "../media/C0106_1.webm";
 
-import largeVideoSrc from "../media/test2.webm";
 import sound from "../media/MaskHallSound.webm";
 
 import fontTexture from '../media/Lora_sdf.png';
@@ -189,20 +187,6 @@ const thisHall: MasksHall = {
                         });
                     });
                 }
-                
-                async function addLargeVideo() : Promise<void> {
-                    return new Promise<void>((resolve, reject) => {
-                        makeVideoWithSize(largeVideoSrc, 4096, 512).then((video) => {
-                            // const plane = makeCurvedScreen(video);
-                            // const plane = makeVideoPlane(video);
-                            // plane.position.set(0,hallwayFloorY, -12.5);
-                            // plane.position.set(0,1, -12.5);
-                            // state.scene.add(plane);
-                            // thisHall.state.largeVideo.push(video);
-                            resolve();
-                        });
-                    });
-                }
 
                 async function addPlanes() : Promise<void> {
                     return new Promise<void>((resolve, reject) => {
@@ -222,48 +206,7 @@ const thisHall: MasksHall = {
                     });
                 }
 
-
-            
-
             const txtMat = makeTextMaterial();
-            // for (let i = 0; i < 20; i++) {
-            //     const txt = generateMarkovText(thisHall.state.ngramAnalysis, 500);
-            //     const ms: MarkovState = {
-            //         nextUpdateTs: window.performance.now() + 1000,
-            //         targetText: txt,
-            //         currLen: 0,
-            //         text: makeTextChars(txtMat, 500)
-            //     };
-            //     updateText(ms.text, ms.targetText);
-            //     thisHall.state.markovState.push(ms);
-            //     state.scene.add(ms.text.mesh);
-            //     ms.text.mesh.position.y = hallwayFloorY + i*0.2;
-            //     ms.text.mesh.position.z = hallTextOffset;
-            //     ms.text.mesh.position.x = -hallwayWidth/2;
-            //     ms.text.mesh.scale.x = 0.2;
-            //     ms.text.mesh.scale.y = 0.2;
-            //     ms.text.mesh.scale.z = 0.2;
-            //     ms.text.mesh.rotateY(Math.PI*0.5);
-            // }
-            // for (let i = 0; i < 20; i++) {
-            //     const txt = generateMarkovText(thisHall.state.ngramAnalysis, 500);
-            //     const ms: MarkovState = {
-            //         nextUpdateTs: window.performance.now() + 1000,
-            //         targetText: txt,
-            //         currLen: 0,
-            //         text: makeTextChars(txtMat, 500)
-            //     };
-            //     updateText(ms.text, ms.targetText);
-            //     thisHall.state.markovState.push(ms);
-            //     state.scene.add(ms.text.mesh);
-            //     ms.text.mesh.position.y = hallwayFloorY + i*0.2;
-            //     ms.text.mesh.position.z = -textHallwayLength;
-            //     ms.text.mesh.position.x = hallwayWidth/2;
-            //     ms.text.mesh.scale.x = 0.2;
-            //     ms.text.mesh.scale.y = 0.2;
-            //     ms.text.mesh.scale.z = 0.2;
-            //     ms.text.mesh.rotateY(-Math.PI*0.5);
-            // }
             
             const textsPerSide = 50;
             for (let i = 0; i < textsPerSide; i++) {
@@ -309,7 +252,7 @@ const thisHall: MasksHall = {
                 ms.text.mesh.rotateY(-Math.PI*0.5);
             }
 
-                Promise.all([addWaypoint(waypointTexture), addPlanes(), addBgAudio(), addLargeVideo()]).then(() => {
+                Promise.all([addWaypoint(waypointTexture), addPlanes(), addBgAudio()]).then(() => {
                     thisHall.state.loadedOnce = true;
                     postLoad();
                     resolve();
@@ -631,73 +574,6 @@ function makeVideoPlane(video: HTMLVideoElement) {
     let material = makeVideoMaterial(video);
     let plane = new Mesh( geometry, material );
     return plane;
-}
-
-function makeCurvedScreen(video: HTMLVideoElement) {
-    let material = makeVideoMaterial(video);
-    const geometry = new BufferGeometry();
-
-    const cx = 0;
-    const cy = 0;
-    const r = 6;//2.75;
-    const numSegments = 20;
-    const numTris = (numSegments-1)*2;
-    const verts = new Float32Array(numSegments*2*3);
-    const uvs = new Float32Array(numSegments*2*2);
-    const indices = new Uint16Array(numTris*3);
-    const arcAngle = 3/2 * Math.PI;//  2 * 3.1415926;
-    const width = (r * arcAngle);
-    const height = 512/4096 * width;
-    { 
-        const theta = arcAngle / numSegments;
-        const c = Math.cos(theta);//precalculate the sine and cosine
-        const s = Math.sin(theta);
-        let t;
-    
-        // let x = 0;
-        // let y = r;
-
-        const correctiveAngle = (2 * Math.PI-arcAngle)/2;
-        let x = - r * Math.sin(correctiveAngle);
-        let y = r * Math.cos(correctiveAngle);
-        
-        for(let segIdx = 0; segIdx < numSegments; segIdx++) {
-            verts[(segIdx*2+0)*3+0] = x + cx;
-            verts[(segIdx*2+0)*3+1] = 0;
-            verts[(segIdx*2+0)*3+2] = y + cy;
-
-            verts[(segIdx*2+1)*3+0] = x + cx;
-            verts[(segIdx*2+1)*3+1] = height;
-            verts[(segIdx*2+1)*3+2] = y + cy;
-
-            uvs[(segIdx*2)*2 + 0] = segIdx/(numSegments-1);
-            uvs[(segIdx*2)*2 + 1] = 0;
-
-            uvs[(segIdx*2+1)*2 + 0] = segIdx/(numSegments-1);
-            uvs[(segIdx*2+1)*2 + 1] = 1;
-
-            //apply the rotation matrix
-            t = x;
-            x = c * x - s * y;
-            y = s * t + c * y;
-        }
-
-        for(let segIdx = 0; segIdx < numSegments-1; segIdx++) {
-            indices[segIdx*6+0] = 0 + 2 * segIdx;
-            indices[segIdx*6+1] = 3 + 2 * segIdx;
-            indices[segIdx*6+2] = 1 + 2 * segIdx;
-
-            indices[segIdx*6+3] = 0 + 2 * segIdx;
-            indices[segIdx*6+4] = 2 + 2 * segIdx;
-            indices[segIdx*6+5] = 3 + 2 * segIdx;
-        }
-    }
-    
-    geometry.setAttribute( 'position', new BufferAttribute( verts, 3 ) );
-    geometry.setAttribute( 'uv', new BufferAttribute( uvs, 2 ) );
-    geometry.setIndex(new BufferAttribute(indices, 1));
-    const mesh = new Mesh( geometry, material );
-    return mesh;
 }
 
 interface AtlasInfo {
