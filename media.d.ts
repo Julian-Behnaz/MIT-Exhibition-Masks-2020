@@ -13,6 +13,11 @@ declare module "*.png" {
     export default filename;
 }
 
+declare module "*.jpg" {
+    const filename: string;
+    export default filename;
+}
+
 declare module "*.txt" {
     const content: string;
     export default content;

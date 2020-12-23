@@ -45,6 +45,28 @@ import fontAtlasLayout from "../media/Lora_layout";
 import markovSource from "../media/TEXT.txt";
 import waypointTexture from "../media/waypoint.png";
 
+import page1Image1 from "../media/images/C01.jpg";
+import page1Image2 from "../media/images/C02.jpg";
+import page1Image3 from "../media/images/C03.jpg";
+import page1Image4 from "../media/images/C04.jpg";
+
+import page4Image1 from "../media/images/A01.jpg";
+import page4Image2 from "../media/images/A02.jpg";
+
+import page5Image1 from "../media/images/B01.jpg";
+import page5Image2 from "../media/images/B02.jpg";
+
+interface PrerenderedImageSets {
+    [index: number]: string[] | undefined
+}
+
+const prerenderedImages: PrerenderedImageSets = {
+    1: [page1Image1,page1Image2,page1Image3, page1Image4],
+    4: [page4Image1, page4Image2],
+    5: [page5Image1, page5Image2],
+};
+
+
 interface MarkovAnalyses {
     [ngramLength: number]: MarkovAnalysis
 }
@@ -106,7 +128,7 @@ const thisHall: MasksHall = {
     setup: async function (renderMode: RenderMode): Promise<void> {
         thisHall.state.renderMode = renderMode;
         if (renderMode.type === RenderModeKind.SavePNG) {
-            PRNG_STATE[0] = renderMode.seed;
+            PRNG_STATE[0] = (renderMode.seed)>>>0;
         } else {
             PRNG_STATE[0] = ((window.performance.now() * 1000)|0)>>>0;
         }
@@ -331,37 +353,76 @@ const thisHall: MasksHall = {
             removeEventListeners();
         }
     },
-    renderPNG: function (renderer) {
+    renderPNG: async function (renderer) {
         const state = thisHall.state;
         const renderMode = state.renderMode;
         if (renderMode.type === RenderModeKind.SavePNG) {
             const imageWidth = 2412;
             const imageHeight = 3074;
 
-            thisHall.state.camera.aspect = imageWidth / imageHeight;
-            thisHall.state.camera.updateProjectionMatrix();
-            renderer.domElement.width = imageWidth;
-            renderer.domElement.height = imageHeight;
-            renderer.setSize(imageWidth, imageHeight);
-
+            const isPrerendered = 
+                renderMode.page === 1
+                || renderMode.page === 4
+                || renderMode.page === 5;
             
-            const page2Angle = pickFloatBetween(0,0.6);
+            let canvasEl;
+            if (isPrerendered) {
+                canvasEl = document.createElement('canvas');
+                canvasEl.width = imageWidth;
+                canvasEl.height = imageHeight;
 
-            const camInfos = [
-                { posZ: -12.3, rotY: 1 }, // Page 1
-                { posZ: 1, rotY: page2Angle }, // Page 2
-                { posZ: 2, rotY: -page2Angle }, // Page 3
-                { posZ: 3, rotY: 0 }, // Page 4
-                { posZ: 4, rotY: 0 }, // Page 5
-            ];
-            const idx = renderMode.page >= 1 && renderMode.page <= 5? renderMode.page-1 : 0;
-            const camInfo = camInfos[idx];
+                async function loadImage(url: string, elem: HTMLImageElement) {
+                    return new Promise((resolve, reject) => {
+                      elem.onload = () => resolve(elem);
+                      elem.onerror = reject;
+                      elem.src = url;
+                    });
+                }
 
-            state.camera.position.set(0, 0, camInfo.posZ);
-            state.camera.rotation.set(0, camInfo.rotY, 0);
-            
-            this.render(renderer);
-            renderer.domElement.toBlob((blob) => {
+                const ctx = canvasEl.getContext('2d');
+                const img = new Image(imageWidth, imageHeight);
+                let imgURLs = prerenderedImages[renderMode.page];
+                if (imgURLs !== undefined) {
+                    const imgURL = pickFromArray(imgURLs);
+                    await loadImage(imgURL, img);
+                    ctx.drawImage(img, 0,0);
+                }
+
+                PRNG_STATE[0] = (renderMode.seed + renderMode.page)>>>0;
+                const ngramLen = pickIntBetween(3,initialNGramLen);
+                const analysis = thisHall.state.ngramAnalyses[ngramLen];
+                const txt = generateMarkovText(analysis,/* maxLength */50);
+
+                ctx.fillStyle = 'white';
+                ctx.font = '72px Lora';
+                ctx.textAlign = 'center';
+                ctx.fillText(txt, (imageWidth/2)|0, 2850);
+            } else {
+                canvasEl = renderer.domElement;
+                thisHall.state.camera.aspect = imageWidth / imageHeight;
+                thisHall.state.camera.updateProjectionMatrix();
+                renderer.domElement.width = imageWidth;
+                renderer.domElement.height = imageHeight;
+                renderer.setSize(imageWidth, imageHeight);
+    
+                const page2Angle = pickFloatBetween(0,0.6);
+    
+                const camInfos = [
+                    { posZ: -12.3, rotY: 1 }, // Page 1
+                    { posZ: 1, rotY: page2Angle }, // Page 2
+                    { posZ: 2, rotY: -page2Angle }, // Page 3
+                    { posZ: 3, rotY: 0 }, // Page 4
+                    { posZ: 4, rotY: 0 }, // Page 5
+                ];
+                const idx = renderMode.page >= 1 && renderMode.page <= 5? renderMode.page-1 : 0;
+                const camInfo = camInfos[idx];
+    
+                state.camera.position.set(0, 0, camInfo.posZ);
+                state.camera.rotation.set(0, camInfo.rotY, 0);
+                this.render(renderer);
+            }
+
+            canvasEl.toBlob((blob) => {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -876,7 +937,12 @@ function pickFloat01(): number {
 }
 
 
-function pickFloatBetween(lo: number,hi: number,): number {
+function pickIntBetween(lo: number,hi: number): number {
+    const res = ((pickFloat01()*(hi-lo))+lo)|0;
+    return res;
+}
+
+function pickFloatBetween(lo: number,hi: number): number {
     const res = (pickFloat01()*(hi-lo))+lo;
     return res;
 }

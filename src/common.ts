@@ -7,7 +7,7 @@ export interface Hall {
     onEnter(renderer: WebGLRenderer): void,
     onLeave(): void,
     render(renderer: WebGLRenderer): void,
-    renderPNG(renderer: WebGLRenderer): void,
+    renderPNG(renderer: WebGLRenderer): Promise<void>,
     teardown(): Promise<void>,
     resize(): void,
     getProgressFrac(): number,

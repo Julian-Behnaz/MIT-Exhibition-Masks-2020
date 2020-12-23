@@ -224,7 +224,7 @@ function handleHalls() {
                         halls.state = HallState.StartedLeavingHall;
                     }
                 } else if (halls.renderMode.type === RenderModeKind.SavePNG) {
-                    halls.allHalls[halls.currHallIdx].renderPNG(halls.renderer);
+                    halls.allHalls[halls.currHallIdx].renderPNG(halls.renderer)
                     halls.renderMode = { type: RenderModeKind.None };
                 }
             } break;
