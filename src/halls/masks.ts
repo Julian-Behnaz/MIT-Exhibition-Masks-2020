@@ -26,7 +26,7 @@ import { normalizeWheel,lerp,lerpTo } from "../utils"
 import { Halls, Hall, HallState, RenderModeKind, RenderMode } from "../common"
 import { waypointMakeState, waypointReset, waypointMoveToMouse, waypointTryStartMove, waypointUpdate, WaypointState, WaypointMovingState } from "../waypoint"
 
-import video1src from "../media/Mask03-3.webm";
+import video1src from "../media/Mask03-3_1.webm";
 import video6src from "../media/MaskF2.webm";
 import video3src from "../media/Mask04.webm";
 import video4src from "../media/Mask05-2.webm";
@@ -147,7 +147,6 @@ const thisHall: MasksHall = {
                     video4src,
                     video5src,
                     video6src,
-                    // video7src,
                 ];
                 state.planeData = [
                     {pos: [-1,0,-12.5], rot:  [0,45,0]},
@@ -161,6 +160,7 @@ const thisHall: MasksHall = {
                 
                 async function addWaypoint(waypointTex: string): Promise<void> {
                     return new Promise<void>((resolve, reject) => {
+                        console.log("Loading Waypoint...");
                         const texture = new TextureLoader().load( waypointTex );
                         let geometry = new PlaneGeometry( 0.4, 0.4, 0.4 );
                         geometry.rotateX(-Math.PI/2);
@@ -168,6 +168,7 @@ const thisHall: MasksHall = {
                         let plane = new Mesh( geometry, material );
                         state.scene.add(plane);
                         state.waypoint = plane;
+                        console.log("Done Loading Waypoint.");
                         resolve(); 
                     });
                 }
@@ -181,8 +182,10 @@ const thisHall: MasksHall = {
                 
                 async function addBgAudio() : Promise<void> {
                     return new Promise<void>((resolve, reject) => {
+                        console.log("Loading Audio...");
                         makeSound(sound).then((sound) => {
                             state.sound.push(sound);
+                            console.log("Done Loading Audio.");
                             resolve();
                         });
                     });
@@ -252,7 +255,10 @@ const thisHall: MasksHall = {
                 ms.text.mesh.rotateY(-Math.PI*0.5);
             }
 
-                Promise.all([addWaypoint(waypointTexture), addPlanes(), addBgAudio()]).then(() => {
+                Promise.all([
+                    addWaypoint(waypointTexture),
+                    addPlanes(),
+                    addBgAudio()]).then(() => {
                     thisHall.state.loadedOnce = true;
                     postLoad();
                     resolve();
@@ -505,14 +511,6 @@ async function makeSound(webmSource: string): Promise<HTMLVideoElement> {
 
     return new Promise<HTMLVideoElement>((resolve, reject) => {
         if (isSupported) {
-            video.src = webmSource;
-            video.width = 640;
-            video.height = 480;
-            video.loop = true;
-        
-            video.preload = 'auto';
-            video.muted = true;
-    
             function onCanPlay () {
                 console.log(webmSource);
                 resolve(video);
@@ -520,6 +518,20 @@ async function makeSound(webmSource: string): Promise<HTMLVideoElement> {
             }
 
             video.addEventListener("canplay", onCanPlay);
+
+            video.preload = 'metadata';
+            video.src = webmSource;
+            video.muted = true;
+            video.autoplay = false;
+            video.width = 640;
+            video.height = 480;
+            video.loop = true;
+            video.load();
+            
+            if (video.readyState >= 3) {
+                console.log(`Loaded ${webmSource} extra fast.`);
+                onCanPlay();
+            }
         } else {
             reject("Your browser doesn't support webm videos.");
         }
@@ -536,21 +548,32 @@ async function makeVideoWithSize(webmSource: string, width: number, height: numb
 
     return new Promise<HTMLVideoElement>((resolve, reject) => {
         if (isSupported) {
+            function onCanPlay () {
+                console.log(`Done Loading video ${webmSource}. [${video.readyState}]`);
+
+                // XXX: Hack to make Chrome render the first frame
+                // without throwing WebGL warnings.
+                video.currentTime = 1/1000;
+
+                resolve(video);
+                video.removeEventListener("canplay", onCanPlay);
+            }
+            video.addEventListener("canplay", onCanPlay);
+
+            console.log(`Loading video ${webmSource}...`);
+            video.preload = 'metadata';
+            video.muted = true;
+            video.autoplay = false;
             video.src = webmSource;
             video.width = width;
             video.height = height;
             video.loop = true;
-        
-            video.preload = 'auto';
-            video.muted = true;
-    
-            function onCanPlay () {
-                console.log(webmSource);
-                resolve(video);
-                video.removeEventListener("canplay", onCanPlay);
-            }
+            video.load();
 
-            video.addEventListener("canplay", onCanPlay);
+            if (video.readyState >= 3) {
+                console.log(`Loaded ${webmSource} extra fast.`);
+                onCanPlay();
+            }
         } else {
             reject("Your browser doesn't support webm videos.");
         }
