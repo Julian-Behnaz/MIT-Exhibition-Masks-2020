@@ -358,8 +358,8 @@ const thisHall: MasksHall = {
     
                 const camInfos = [
                     { posZ: -12.3, rotY: 1 }, // Page 1
-                    { posZ: 1, rotY: page2Angle }, // Page 2
-                    { posZ: 2, rotY: -page2Angle }, // Page 3
+                    { posZ: 0, rotY: page2Angle }, // Page 2
+                    { posZ: 0, rotY: -page2Angle }, // Page 3
                     { posZ: 3, rotY: 0 }, // Page 4
                     { posZ: 4, rotY: 0 }, // Page 5
                 ];

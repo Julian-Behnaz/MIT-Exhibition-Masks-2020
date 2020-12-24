@@ -10,13 +10,8 @@
 }
 
 .loading {
-    position: fixed;
-    bottom: 0;
-    left: 0;
     color: white;
     background-color: #333;
-    width: 100%;
-    z-index: 2;
     text-align: center;
     padding: 1rem;
     /* Allow click to pass through */
@@ -29,14 +24,14 @@
     text-align: left;
 }
 
-.interstitial, .landing {
-    width: 100%;
-    min-height: 100vh;
-    padding-bottom: 10rem;
+.interstitial {
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
 }
 
-.lauren-interstitial {
-    position: absolute;
+.interstitial, .landing {
+    padding-bottom: 2rem;
 }
 
 /* Fonts */
@@ -51,10 +46,6 @@
 .intro p {
     font-size: 1.1rem;
     line-height: 1.3rem;
-}
-
-.hall-list p {
-    font-size: 1rem;
 }
 
 .loading {

@@ -7,43 +7,12 @@ body {
     margin: 0;
 }
 
-.navigation {
-    position: fixed;
-    top: 0;
-    left: 0;
-    color: black;
-    padding: 1rem;
-    cursor: pointer;
-    max-height: 100vh;
-    overflow: auto;
-}
-
-.navigation img {
-    height: 3rem;
-}
-
-.navigation .active img {
-    filter: invert(1);
-}
-
-.navigation ul {
-    padding: 0;
-    margin: 0;
-    list-style: none;
-}
-
-.navigation p {
-    display: none;
-}
-
-.logos {
+.main {
+    margin-left: auto;
+    margin-right: auto;
     display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-}
-
-.logos>img {
-    max-width: 12rem;
+    flex-direction: column;
+    height: 100vh;
 }
 
 .hidden {
@@ -56,15 +25,6 @@ body {
     display: block;
 }
 
-.iframe-hall {
-    display: block;
-    position: absolute;
-    top: 0;
-    width: 100vw;
-    height: 100vh;
-    border: 0;
-}
-
 footer {
     margin-top: 2rem;
 }
@@ -75,68 +35,4 @@ footer.attribution p {
 
 footer p {
     margin: 0;
-}
-
-.books {
-    display: flex;
-    justify-content: space-between;
-    list-style: none;
-    flex-wrap: wrap;
-    padding: 0;
-}
-.books .info {
-    display: none;
-}
-
-.books a {
-    display: inline-block;
-}
-
-.books a img {
-    opacity: 0.7;
-    transition-property: opacity;
-    transition-duration: 0.2s;
-}
-
-.books a:hover img {
-    opacity: 1;
-}
-
-.books img {
-    max-height: 14rem;
-}
-
-.reflection-hall h3 {
-    text-align: center;
-    margin: 0;
-    color: white;
-}
-
-.reflection-hall article {
-    margin-bottom: 3rem;
-}
-
-.reflection-hall article>p {
-    font-size: 1.1rem;
-    margin-top: 0.5rem;
-}
-
-.reflection-hall a {
-    text-decoration: none;
-    color: white;
-}
-
-/* Video wrapper from https://css-tricks.com/fluid-width-video/ */
-.videoWrapper {
-    position: relative;
-    padding-bottom: 56.25%; /* 16:9 */
-    height: 0;
-  }
-
-.videoWrapper iframe {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
 }

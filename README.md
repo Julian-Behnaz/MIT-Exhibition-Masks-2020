@@ -16,4 +16,6 @@ Command:
 
 ## License
 
-Licensed under the MIT License. See [LICENSE](./LICENSE).
+Code licensed under the MIT License. See [LICENSE](./LICENSE).
+
+Source text for the Markov text ([media/TEXT.txt](src/media/TEXT.txt)) is an excerpt from the seminal article “Can The Subaltern Speak?” by the feminist theorist Gayatri Spivak (1985).
