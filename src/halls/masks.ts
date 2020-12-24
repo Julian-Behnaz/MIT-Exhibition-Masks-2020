@@ -354,12 +354,13 @@ const thisHall: MasksHall = {
                 renderer.domElement.height = imageHeight;
                 renderer.setSize(imageWidth, imageHeight);
     
-                const page2Angle = pickFloatBetween(0,0.6);
+                const page2Angle = 0.45;//pickFloatBetween(0.45,0.6);
+                const page2_3Depth = pickFloatBetween(-2,0);
     
                 const camInfos = [
                     { posZ: -12.3, rotY: 1 }, // Page 1
-                    { posZ: 0, rotY: page2Angle }, // Page 2
-                    { posZ: 0, rotY: -page2Angle }, // Page 3
+                    { posZ: page2_3Depth, rotY: page2Angle }, // Page 2
+                    { posZ: page2_3Depth, rotY: -page2Angle }, // Page 3
                     { posZ: 3, rotY: 0 }, // Page 4
                     { posZ: 4, rotY: 0 }, // Page 5
                 ];
