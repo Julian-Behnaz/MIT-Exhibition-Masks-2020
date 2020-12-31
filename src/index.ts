@@ -1,12 +1,9 @@
 import './main.css';
-import { Scene, PerspectiveCamera, PlaneGeometry, MeshBasicMaterial, Mesh, WebGLRenderer, VideoTexture, LinearFilter, RGBFormat } from "three";
+import {  WebGLRenderer} from "three";
 
-import { Halls, Hall, HallState, RenderModeKind, RenderMode } from "./common"
+import { Halls, HallState, RenderModeKind } from "./common"
 import { getTimestamp } from "./utils"
 import * as masksHall from "./halls/masks"
-
-import reflectionIcon from "./media/map/reflection.png"
-import landingIcon from "./media/map/home.png"
 
 import * as Stats from "stats.js"
 let stats = new Stats();
@@ -235,11 +232,6 @@ function handleHalls() {
                     halls.currHallIdx = (halls.currHallIdx + 1) % halls.allHalls.length;
                     console.log(`Now entering hall: ${halls.currHallIdx}`);
                     halls.state = HallState.StartedLoadingHall;
-
-                    // if (halls.currHallIdx === 0) {
-                    //     halls.state = HallState.Reflecting;
-                    //     setReflectionVisibility(true);
-                    // }
                 });
             } break;
         case HallState.LeavingHall:

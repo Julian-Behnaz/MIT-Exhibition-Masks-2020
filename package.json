@@ -1,9 +1,9 @@
 {
-  "name": "museum",
+  "name": "can-the-subaltern-speak",
   "version": "1.0.0",
   "main": "index.js",
   "author": "jceipek",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "dependencies": {
     "stats.js": "^0.17.0",
