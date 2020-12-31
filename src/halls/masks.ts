@@ -10,7 +10,6 @@ import { Vector3,
      FogExp2,
      LinearFilter,
      RGBFormat,
-     BufferGeometry,
      InstancedBufferGeometry,
      InstancedBufferAttribute,
      InstancedMesh,
@@ -23,17 +22,17 @@ import { Vector3,
   
      } from "three";
 import { normalizeWheel,lerp,lerpTo } from "../utils"
-import { Halls, Hall, HallState, RenderModeKind, RenderMode } from "../common"
+import { Hall, RenderModeKind, RenderMode } from "../common"
 import { waypointMakeState, waypointReset, waypointMoveToMouse, waypointTryStartMove, waypointUpdate, WaypointState, WaypointMovingState } from "../waypoint"
 
-import video1src from "../media/Mask03-3_1.webm";
+import video1src from "../media/Mask03_1.webm";
 import video6src from "../media/MaskF2.webm";
 import video3src from "../media/Mask04.webm";
 import video4src from "../media/Mask05-2.webm";
 import video5src from "../media/Mask01.webm";
-import video2src from "../media/MaskF1-1.webm";
+import video2src from "../media/MaskF1_1.webm";
 
-import sound from "../media/MaskHallSound.webm";
+import sound from "../media/sound.webm";
 
 import fontTexture from '../media/Lora_sdf.png';
 import fontVertSrc from "../fontShaders/vert.vs";
@@ -155,7 +154,6 @@ const thisHall: MasksHall = {
                     {pos: [1,0,-14], rot:  [0,-15,0]},
                     {pos: [0,0,-18], rot: [0,0,0]},
                     {pos: [-0.9,0,-9.5], rot: [0,30,0]},
-                    // {pos: [-2,0,-8.5], rot: [0,90,0]},
                 ];
                 
                 async function addWaypoint(waypointTex: string): Promise<void> {
@@ -272,19 +270,19 @@ const thisHall: MasksHall = {
     },
     onEnter: function (renderer: WebGLRenderer) {
         renderer.setClearColor("black");
-        thisHall.state.vids.forEach(vid => {
-            vid.muted = false;
-            vid.play();
-        });
-        thisHall.state.sound.forEach(sound => {
-            sound.muted = false;
-            sound.play()
-        });
-        thisHall.state.largeVideo.forEach(vid => {
-            vid.muted = false;
-            vid.play()
-        });
         if (thisHall.state.renderMode.type === RenderModeKind.Interactive) {
+            thisHall.state.vids.forEach(vid => {
+                vid.muted = false;
+                vid.play();
+            });
+            thisHall.state.sound.forEach(sound => {
+                sound.muted = false;
+                sound.play()
+            });
+            thisHall.state.largeVideo.forEach(vid => {
+                vid.muted = false;
+                vid.play()
+            });
             registerEventListeners();
         }
     },
@@ -328,6 +326,9 @@ const thisHall: MasksHall = {
                     });
                 }
 
+                PRNG_STATE[0] = (renderMode.seed + renderMode.page)>>>0;
+                PRNG_STATE[0] = PRNG_STATE[0]? PRNG_STATE[0] : 1;
+                
                 const ctx = canvasEl.getContext('2d');
                 const img = new Image(imageWidth, imageHeight);
                 let imgURLs = prerenderedImages[renderMode.page];
@@ -337,9 +338,17 @@ const thisHall: MasksHall = {
                     ctx.drawImage(img, 0,0);
                 }
 
-                PRNG_STATE[0] = (renderMode.seed + renderMode.page)>>>0;
-                const ngramLen = pickIntBetween(3,initialNGramLen);
-                const analysis = thisHall.state.ngramAnalyses[ngramLen];
+                let analysis;
+                if (renderMode.page === 1) {
+                    const ngramLen = pickIntBetween(3, initialNGramLen);
+                    analysis = thisHall.state.ngramAnalyses[ngramLen];
+                } else if (renderMode.page === 4) {
+                    const ngramLen = pickIntBetween(2, initialNGramLen);
+                    analysis = ngramify("Can women have a voice?", ngramLen);
+                } else {
+                    const ngramLen = pickIntBetween(2, initialNGramLen);
+                    analysis = ngramify("Can the subaltern speak?", ngramLen);
+                }
                 const txt = generateMarkovText(analysis,/* maxLength */50);
 
                 ctx.fillStyle = 'white';

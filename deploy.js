@@ -71,5 +71,5 @@ fs.readdir(directory).then((files) => {
 }).then(() => {
     console.log("Checkout working branch");
     // git checkout all again
-    return git.checkout("AllRooms/all");
+    return git.checkout("main");
 });
