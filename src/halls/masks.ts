@@ -756,7 +756,8 @@ function updateText(text: DynamicText, targetString: string) {
     }
     mesh.instanceMatrix.needsUpdate = true;
     for (let i = 0; i < targetString.length; i++) {
-        const atlasBounds = charAtlasInfo[targetString[i]].atlasBounds;
+        const info = charAtlasInfo[targetString[i]];
+        const atlasBounds = info.atlasBounds;
         atlasRegions[i*4+0] = atlasBounds.left;
         atlasRegions[i*4+1] = atlasBounds.bottom;
         atlasRegions[i*4+2] = atlasBounds.right;
@@ -799,10 +800,10 @@ function ngramify(srcText: string, ngramLength: number): MarkovAnalysis {
     const beginnings = res.beginnings;
     const frequencies = res.freqs;
 
-    for (var j = 0; j < textLines.length; j++) {
-        var txt = textLines[j];
-        for (var i = 0; i <= txt.length - ngramLength; i++) {
-          var gram = txt.substring(i, i + ngramLength);
+    for (let j = 0; j < textLines.length; j++) {
+        let txt = textLines[j].trim();
+        for (let i = 0; i <= txt.length - ngramLength; i++) {
+          let gram = txt.substring(i, i + ngramLength);
     
           if (i == 0) {
             beginnings.push(gram);// string 
